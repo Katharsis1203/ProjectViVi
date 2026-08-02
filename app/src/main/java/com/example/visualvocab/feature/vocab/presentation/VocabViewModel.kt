@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.visualvocab.core.image.BitmapLoader
 import com.example.visualvocab.data.training.TrainingExportManager
+import com.example.visualvocab.data.modelupdate.ModelUpdateManager
+import com.example.visualvocab.data.datasetupload.DatasetUploadManager
 import com.example.visualvocab.domain.model.AppMode
 import com.example.visualvocab.domain.model.DetectionResult
 import com.example.visualvocab.domain.model.SentenceDifficulty
@@ -37,7 +39,11 @@ class VocabViewModel(
     private val trainingRepository:
     TrainingRepository,
     private val trainingExportManager:
-    TrainingExportManager
+    TrainingExportManager,
+    private val modelUpdateManager:
+    ModelUpdateManager,
+    private val datasetUploadManager:
+    DatasetUploadManager
 ) : ViewModel() {
 
     private val _uiState =
@@ -59,6 +65,14 @@ class VocabViewModel(
 
     init {
         refreshTrainingExampleCount()
+
+        _uiState.update {
+            it.copy(
+                currentModelVersion =
+                    modelUpdateManager
+                        .getCurrentVersion()
+            )
+        }
     }
 
     fun onEvent(
@@ -147,6 +161,28 @@ class VocabViewModel(
                     it.copy(
                         trainingMessage = null
                     )
+                }
+
+            VocabUiEvent.CheckForModelUpdate ->
+                checkForModelUpdate()
+
+            VocabUiEvent.InstallAvailableModelUpdate ->
+                installAvailableModelUpdate()
+
+            VocabUiEvent.DismissModelUpdate ->
+                _uiState.update {
+                    it.copy(
+                        availableModelManifest = null,
+                        modelUpdateMessage = null
+                    )
+                }
+
+            VocabUiEvent.UploadTrainingDataset ->
+                uploadTrainingDataset()
+
+            VocabUiEvent.ClearDatasetUploadMessage ->
+                _uiState.update {
+                    it.copy(datasetUploadMessage = null)
                 }
         }
     }
@@ -852,6 +888,155 @@ class VocabViewModel(
                     }
                 }
             }
+    }
+
+    private fun uploadTrainingDataset() {
+        if (_uiState.value.trainingExampleCount <= 0) {
+            _uiState.update {
+                it.copy(datasetUploadMessage = "Save at least one training example first.")
+            }
+            return
+        }
+
+        trainingJob?.cancel()
+        trainingJob = viewModelScope.launch {
+            try {
+                _uiState.update {
+                    it.copy(
+                        isUploadingTrainingDataset = true,
+                        datasetUploadMessage = "Preparing and uploading dataset…"
+                    )
+                }
+
+                val result = datasetUploadManager.uploadDataset()
+                _uiState.update {
+                    it.copy(
+                        isUploadingTrainingDataset = false,
+                        datasetUploadMessage = buildString {
+                            append(result.message)
+                            result.uploadId?.takeIf(String::isNotBlank)?.let {
+                                append(" Upload ID: ")
+                                append(it)
+                            }
+                        }
+                    )
+                }
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isUploadingTrainingDataset = false,
+                        datasetUploadMessage = exception.message
+                            ?: "Could not upload the training dataset."
+                    )
+                }
+            }
+        }
+    }
+
+    private fun checkForModelUpdate() {
+        viewModelScope.launch {
+            try {
+                _uiState.update {
+                    it.copy(
+                        isCheckingModelUpdate =
+                            true,
+                        modelUpdateMessage =
+                            null
+                    )
+                }
+
+                val update =
+                    modelUpdateManager
+                        .checkForUpdate()
+
+                _uiState.update {
+                    it.copy(
+                        isCheckingModelUpdate =
+                            false,
+                        availableModelManifest =
+                            if (
+                                update.isNewer
+                            ) {
+                                update.manifest
+                            } else {
+                                null
+                            },
+                        modelUpdateMessage =
+                            if (
+                                update.isNewer
+                            ) {
+                                "Model ${update.manifest.version} is available."
+                            } else {
+                                "Your detection model is up to date."
+                            }
+                    )
+                }
+            } catch (
+                exception: Exception
+            ) {
+                _uiState.update {
+                    it.copy(
+                        isCheckingModelUpdate =
+                            false,
+                        modelUpdateMessage =
+                            exception.message
+                                ?: "Could not check for model updates."
+                    )
+                }
+            }
+        }
+    }
+
+    private fun installAvailableModelUpdate() {
+        val manifest =
+            _uiState.value
+                .availableModelManifest
+                ?: return
+
+        viewModelScope.launch {
+            try {
+                _uiState.update {
+                    it.copy(
+                        isInstallingModelUpdate =
+                            true,
+                        modelUpdateMessage =
+                            "Downloading model ${manifest.version}…"
+                    )
+                }
+
+                modelUpdateManager
+                    .downloadAndInstall(
+                        manifest
+                    )
+
+                _uiState.update {
+                    it.copy(
+                        isInstallingModelUpdate =
+                            false,
+                        currentModelVersion =
+                            manifest.version,
+                        availableModelManifest =
+                            null,
+                        modelUpdateMessage =
+                            "Model installed. Restart the app to activate it."
+                    )
+                }
+            } catch (
+                exception: Exception
+            ) {
+                _uiState.update {
+                    it.copy(
+                        isInstallingModelUpdate =
+                            false,
+                        modelUpdateMessage =
+                            exception.message
+                                ?: "Could not install the model update."
+                    )
+                }
+            }
+        }
     }
 
     private fun refreshTrainingExampleCount() {

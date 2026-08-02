@@ -6,6 +6,7 @@ import com.example.visualvocab.domain.model.AppMode
 import com.example.visualvocab.domain.model.DetectionResult
 import com.example.visualvocab.domain.model.SentenceDifficulty
 import com.example.visualvocab.domain.model.Vocabulary
+import com.example.visualvocab.data.modelupdate.ModelManifest
 
 data class VocabUiState(
     val selectedImageUri: Uri? = null,
@@ -41,14 +42,31 @@ data class VocabUiState(
     Boolean = false,
     val isExportingTrainingDataset:
     Boolean = false,
-    val trainingMessage: String? = null
+    val trainingMessage: String? = null,
+
+    val currentModelVersion: String =
+        "bundled-1.0.0",
+    val availableModelManifest:
+    ModelManifest? = null,
+    val isCheckingModelUpdate:
+    Boolean = false,
+    val isInstallingModelUpdate:
+    Boolean = false,
+    val modelUpdateMessage:
+    String? = null,
+
+    val isUploadingTrainingDataset: Boolean = false,
+    val datasetUploadMessage: String? = null
 ) {
     val isProcessing: Boolean
         get() =
             isDetecting ||
                     isGenerating ||
                     isSavingTrainingExample ||
-                    isExportingTrainingDataset
+                    isExportingTrainingDataset ||
+                    isCheckingModelUpdate ||
+                    isInstallingModelUpdate ||
+                    isUploadingTrainingDataset
 
     val hasSelectedObject: Boolean
         get() =

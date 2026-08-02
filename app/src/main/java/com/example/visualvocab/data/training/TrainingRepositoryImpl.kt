@@ -6,17 +6,17 @@ import com.example.visualvocab.domain.model.training.TrainingAnnotation
 import com.example.visualvocab.domain.repository.TrainingRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.OutputStream
+import java.util.Locale
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
-import kotlin.math.roundToInt
 
 class TrainingRepositoryImpl(
     context: Context
@@ -25,42 +25,50 @@ class TrainingRepositoryImpl(
     private val appContext =
         context.applicationContext
 
-    private val json = Json {
-        prettyPrint = true
-        encodeDefaults = true
-        ignoreUnknownKeys = true
-    }
+    private val json =
+        Json {
+            prettyPrint = true
+            encodeDefaults = true
+            ignoreUnknownKeys = true
+        }
 
     private val rootDirectory: File
-        get() = File(
-            appContext.filesDir,
-            TRAINING_DIRECTORY
-        )
+        get() =
+            File(
+                appContext.filesDir,
+                TRAINING_DIRECTORY
+            )
 
     private val imageDirectory: File
-        get() = File(
-            rootDirectory,
-            IMAGE_DIRECTORY
-        )
+        get() =
+            File(
+                rootDirectory,
+                IMAGE_DIRECTORY
+            )
 
     private val metadataFile: File
-        get() = File(
-            rootDirectory,
-            METADATA_FILE
-        )
+        get() =
+            File(
+                rootDirectory,
+                METADATA_FILE
+            )
 
     override suspend fun saveExample(
         bitmap: Bitmap,
-        annotations: List<TrainingAnnotation>
+        annotations:
+        List<TrainingAnnotation>
     ) = withContext(Dispatchers.IO) {
-        require(annotations.isNotEmpty()) {
+        require(
+            annotations.isNotEmpty()
+        ) {
             "Confirm at least one object first."
         }
 
         ensureDirectories()
 
         val exampleId =
-            UUID.randomUUID().toString()
+            UUID.randomUUID()
+                .toString()
 
         val imageFileName =
             "$exampleId.jpg"
@@ -71,18 +79,20 @@ class TrainingRepositoryImpl(
                 imageFileName
             )
 
-        imageFile.outputStream().use { output ->
-            val saved =
-                bitmap.compress(
-                    Bitmap.CompressFormat.JPEG,
-                    JPEG_QUALITY,
-                    output
-                )
+        imageFile
+            .outputStream()
+            .use { output ->
+                val saved =
+                    bitmap.compress(
+                        Bitmap.CompressFormat.JPEG,
+                        JPEG_QUALITY,
+                        output
+                    )
 
-            check(saved) {
-                "The training image could not be saved."
+                check(saved) {
+                    "The training image could not be saved."
+                }
             }
-        }
 
         val dataset =
             readDataset()
@@ -90,19 +100,27 @@ class TrainingRepositoryImpl(
         val storedExample =
             StoredTrainingExample(
                 id = exampleId,
-                imageFileName = imageFileName,
-                imageWidth = bitmap.width,
-                imageHeight = bitmap.height,
+                imageFileName =
+                    imageFileName,
+                imageWidth =
+                    bitmap.width,
+                imageHeight =
+                    bitmap.height,
                 createdAt =
                     System.currentTimeMillis(),
                 annotations =
                     annotations.map {
                         StoredTrainingAnnotation(
-                            label = it.label,
-                            left = it.left,
-                            top = it.top,
-                            right = it.right,
-                            bottom = it.bottom,
+                            label =
+                                it.label,
+                            left =
+                                it.left,
+                            top =
+                                it.top,
+                            right =
+                                it.right,
+                            bottom =
+                                it.bottom,
                             originalLabel =
                                 it.originalLabel,
                             originalConfidence =
@@ -126,116 +144,88 @@ class TrainingRepositoryImpl(
         val dataset =
             readDataset()
 
-        require(dataset.examples.isNotEmpty()) {
+        require(
+            dataset.examples.isNotEmpty()
+        ) {
             "No training examples have been saved."
         }
 
-        val categories =
+        val classNames =
             dataset.examples
                 .flatMap {
                     it.annotations
                 }
                 .map {
-                    it.label.trim().lowercase()
+                    normalizeLabel(
+                        it.label
+                    )
+                }
+                .filter {
+                    it.isNotBlank()
                 }
                 .distinct()
                 .sorted()
-                .mapIndexed { index, label ->
-                    CocoCategory(
-                        id = index + 1,
-                        name = label
-                    )
+
+        require(
+            classNames.isNotEmpty()
+        ) {
+            "The training dataset contains no valid labels."
+        }
+
+        val classIds =
+            classNames
+                .mapIndexed {
+                        index,
+                        label ->
+
+                    label to index
+                }
+                .toMap()
+
+        val validExamples =
+            dataset.examples
+                .filter { example ->
+                    File(
+                        imageDirectory,
+                        example.imageFileName
+                    ).isFile
                 }
 
-        val categoryIds =
-            categories.associate {
-                it.name to it.id
-            }
+        require(
+            validExamples.isNotEmpty()
+        ) {
+            "The training dataset contains no image files."
+        }
 
-        val cocoImages =
-            dataset.examples.mapIndexed {
-                    index,
-                    example ->
+        val classesMetadata =
+            YoloClassesMetadata(
+                names =
+                    classNames
+                        .mapIndexed {
+                                index,
+                                name ->
 
-                CocoImage(
-                    id = index + 1,
-                    fileName =
-                        example.imageFileName,
-                    width =
-                        example.imageWidth,
-                    height =
-                        example.imageHeight
-                )
-            }
+                            index.toString() to
+                                    name
+                        }
+                        .toMap(),
+                input_size =
+                    DEFAULT_MODEL_INPUT_SIZE,
+                dataset_format =
+                    "ultralytics-yolo",
+                dataset_version =
+                    DATASET_FORMAT_VERSION
+            )
 
-        var nextAnnotationId = 1
-
-        val cocoAnnotations =
-            dataset.examples.flatMapIndexed {
-                    imageIndex,
-                    example ->
-
-                example.annotations.map {
-                        annotation ->
-
-                    val x =
-                        annotation.left *
-                                example.imageWidth
-
-                    val y =
-                        annotation.top *
-                                example.imageHeight
-
-                    val width =
-                        (
-                                annotation.right -
-                                        annotation.left
-                                ) *
-                                example.imageWidth
-
-                    val height =
-                        (
-                                annotation.bottom -
-                                        annotation.top
-                                ) *
-                                example.imageHeight
-
-                    CocoAnnotation(
-                        id = nextAnnotationId++,
-                        imageId =
-                            imageIndex + 1,
-                        categoryId =
-                            categoryIds.getValue(
-                                annotation.label
-                                    .trim()
-                                    .lowercase()
-                            ),
-                        boundingBox =
-                            listOf(
-                                x.roundToInt(),
-                                y.roundToInt(),
-                                width.roundToInt(),
-                                height.roundToInt()
-                            ),
-                        area =
-                            width * height,
-                        isCrowd = 0
-                    )
-                }
-            }
-
-        val cocoDataset =
-            CocoDataset(
-                images = cocoImages,
-                annotations =
-                    cocoAnnotations,
-                categories = categories
+        val datasetYaml =
+            createDatasetYaml(
+                classNames
             )
 
         ZipOutputStream(
             outputStream.buffered()
         ).use { zip ->
-            dataset.examples.forEach {
+            validExamples.forEach {
                     example ->
 
                 val imageFile =
@@ -244,64 +234,283 @@ class TrainingRepositoryImpl(
                         example.imageFileName
                     )
 
-                if (!imageFile.exists()) {
-                    return@forEach
-                }
-
-                zip.putNextEntry(
-                    ZipEntry(
-                        "images/" +
-                                example.imageFileName
-                    )
+                writeFileEntry(
+                    zip = zip,
+                    entryName =
+                        "images/${example.imageFileName}",
+                    file = imageFile
                 )
 
-                imageFile.inputStream().use {
-                        input ->
+                val labelFileName =
+                    example.imageFileName
+                        .substringBeforeLast(
+                            '.'
+                        ) +
+                            ".txt"
 
-                    input.copyTo(zip)
-                }
+                val labelText =
+                    createYoloLabelText(
+                        example =
+                            example,
+                        classIds =
+                            classIds
+                    )
 
-                zip.closeEntry()
+                writeTextEntry(
+                    zip = zip,
+                    entryName =
+                        "labels/$labelFileName",
+                    text =
+                        labelText
+                )
             }
 
-            zip.putNextEntry(
-                ZipEntry(
-                    "annotations.json"
-                )
+            writeTextEntry(
+                zip = zip,
+                entryName =
+                    "dataset.yaml",
+                text =
+                    datasetYaml
             )
 
-            zip.write(
-                json.encodeToString(
-                    cocoDataset
-                ).toByteArray()
+            writeTextEntry(
+                zip = zip,
+                entryName =
+                    "classes.json",
+                text =
+                    json.encodeToString(
+                        classesMetadata
+                    )
             )
-
-            zip.closeEntry()
         }
     }
 
-    override suspend fun getExampleCount(): Int =
+    override suspend fun exportDatasetToByteArray():
+            ByteArray =
         withContext(Dispatchers.IO) {
-            readDataset().examples.size
+            ByteArrayOutputStream()
+                .use { output ->
+                    exportDataset(output)
+                    output.toByteArray()
+                }
         }
+
+    override suspend fun getExampleCount():
+            Int =
+        withContext(Dispatchers.IO) {
+            readDataset()
+                .examples
+                .size
+        }
+
+    private fun createYoloLabelText(
+        example:
+        StoredTrainingExample,
+        classIds:
+        Map<String, Int>
+    ): String {
+        val lines =
+            example.annotations
+                .mapNotNull {
+                        annotation ->
+
+                    val normalizedLabel =
+                        normalizeLabel(
+                            annotation.label
+                        )
+
+                    val classId =
+                        classIds[
+                            normalizedLabel
+                        ]
+                            ?: return@mapNotNull null
+
+                    val left =
+                        annotation.left
+                            .coerceIn(
+                                0f,
+                                1f
+                            )
+
+                    val top =
+                        annotation.top
+                            .coerceIn(
+                                0f,
+                                1f
+                            )
+
+                    val right =
+                        annotation.right
+                            .coerceIn(
+                                0f,
+                                1f
+                            )
+
+                    val bottom =
+                        annotation.bottom
+                            .coerceIn(
+                                0f,
+                                1f
+                            )
+
+                    val width =
+                        right - left
+
+                    val height =
+                        bottom - top
+
+                    if (
+                        width <= 0f ||
+                        height <= 0f
+                    ) {
+                        return@mapNotNull null
+                    }
+
+                    val centerX =
+                        left +
+                                width / 2f
+
+                    val centerY =
+                        top +
+                                height / 2f
+
+                    String.format(
+                        Locale.US,
+                        "%d %.6f %.6f %.6f %.6f",
+                        classId,
+                        centerX,
+                        centerY,
+                        width,
+                        height
+                    )
+                }
+
+        return lines.joinToString(
+            separator = "\n",
+            postfix =
+                if (
+                    lines.isNotEmpty()
+                ) {
+                    "\n"
+                } else {
+                    ""
+                }
+        )
+    }
+
+    private fun createDatasetYaml(
+        classNames:
+        List<String>
+    ): String {
+        return buildString {
+            appendLine("path: .")
+            appendLine(
+                "train: images"
+            )
+            appendLine(
+                "val: images"
+            )
+            appendLine("names:")
+
+            classNames.forEachIndexed {
+                    index,
+                    name ->
+
+                append("  ")
+                append(index)
+                append(": ")
+                appendLine(
+                    quoteYamlString(
+                        name
+                    )
+                )
+            }
+        }
+    }
+
+    private fun quoteYamlString(
+        value: String
+    ): String {
+        return "\"" +
+                value
+                    .replace(
+                        "\\",
+                        "\\\\"
+                    )
+                    .replace(
+                        "\"",
+                        "\\\""
+                    ) +
+                "\""
+    }
+
+    private fun writeFileEntry(
+        zip: ZipOutputStream,
+        entryName: String,
+        file: File
+    ) {
+        zip.putNextEntry(
+            ZipEntry(entryName)
+        )
+
+        file.inputStream()
+            .use { input ->
+                input.copyTo(zip)
+            }
+
+        zip.closeEntry()
+    }
+
+    private fun writeTextEntry(
+        zip: ZipOutputStream,
+        entryName: String,
+        text: String
+    ) {
+        zip.putNextEntry(
+            ZipEntry(entryName)
+        )
+
+        zip.write(
+            text.toByteArray(
+                Charsets.UTF_8
+            )
+        )
+
+        zip.closeEntry()
+    }
+
+    private fun normalizeLabel(
+        value: String
+    ): String {
+        return value
+            .trim()
+            .lowercase(
+                Locale.ROOT
+            )
+    }
 
     private fun ensureDirectories() {
         rootDirectory.mkdirs()
         imageDirectory.mkdirs()
     }
 
-    private fun readDataset(): StoredDataset {
+    private fun readDataset():
+            StoredDataset {
         ensureDirectories()
 
         if (
             !metadataFile.exists() ||
-            metadataFile.readText().isBlank()
+            metadataFile
+                .readText()
+                .isBlank()
         ) {
             return StoredDataset()
         }
 
         return runCatching {
-            json.decodeFromString<StoredDataset>(
+            json.decodeFromString<
+                    StoredDataset
+                    >(
                 metadataFile.readText()
             )
         }.getOrElse {
@@ -315,7 +524,9 @@ class TrainingRepositoryImpl(
         ensureDirectories()
 
         metadataFile.writeText(
-            json.encodeToString(dataset)
+            json.encodeToString(
+                dataset
+            )
         )
     }
 
@@ -344,53 +555,19 @@ class TrainingRepositoryImpl(
         val top: Float,
         val right: Float,
         val bottom: Float,
-        val originalLabel: String? = null,
-        val originalConfidence: Float? = null
+        val originalLabel:
+        String? = null,
+        val originalConfidence:
+        Float? = null
     )
 
     @Serializable
-    private data class CocoDataset(
-        val images: List<CocoImage>,
-        val annotations:
-        List<CocoAnnotation>,
-        val categories:
-        List<CocoCategory>
-    )
-
-    @Serializable
-    private data class CocoImage(
-        val id: Int,
-
-        @SerialName("file_name")
-        val fileName: String,
-
-        val width: Int,
-        val height: Int
-    )
-
-    @Serializable
-    private data class CocoAnnotation(
-        val id: Int,
-
-        @SerialName("image_id")
-        val imageId: Int,
-
-        @SerialName("category_id")
-        val categoryId: Int,
-
-        @SerialName("bbox")
-        val boundingBox: List<Int>,
-
-        val area: Float,
-
-        @SerialName("iscrowd")
-        val isCrowd: Int
-    )
-
-    @Serializable
-    private data class CocoCategory(
-        val id: Int,
-        val name: String
+    private data class YoloClassesMetadata(
+        val names:
+        Map<String, String>,
+        val input_size: Int,
+        val dataset_format: String,
+        val dataset_version: Int
     )
 
     companion object {
@@ -405,5 +582,11 @@ class TrainingRepositoryImpl(
 
         private const val JPEG_QUALITY =
             92
+
+        private const val DEFAULT_MODEL_INPUT_SIZE =
+            640
+
+        private const val DATASET_FORMAT_VERSION =
+            1
     }
 }

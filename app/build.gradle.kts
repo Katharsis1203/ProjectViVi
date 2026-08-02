@@ -149,6 +149,14 @@ dependencies {
     )
 
     /*
+     * TensorFlow Lite interpreter used by the experimental YOLO detector.
+     * EfficientDet/MediaPipe remains enabled alongside it.
+     */
+    implementation(
+        "org.tensorflow:tensorflow-lite:2.17.0"
+    )
+
+    /*
      * Networking and JSON serialization for Groq
      */
     implementation(libs.okhttp)

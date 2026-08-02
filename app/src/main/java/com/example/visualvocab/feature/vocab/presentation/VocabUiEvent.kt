@@ -67,4 +67,19 @@ sealed interface VocabUiEvent {
 
     data object ClearTrainingMessage :
         VocabUiEvent
+
+    data object CheckForModelUpdate :
+        VocabUiEvent
+
+    data object InstallAvailableModelUpdate :
+        VocabUiEvent
+
+    data object DismissModelUpdate :
+        VocabUiEvent
+
+    data object UploadTrainingDataset :
+        VocabUiEvent
+
+    data object ClearDatasetUploadMessage :
+        VocabUiEvent
 }

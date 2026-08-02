@@ -15,5 +15,7 @@ interface TrainingRepository {
         outputStream: OutputStream
     )
 
+    suspend fun exportDatasetToByteArray(): ByteArray
+
     suspend fun getExampleCount(): Int
 }

@@ -4,14 +4,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,13 +33,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,7 +50,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -69,13 +66,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.example.visualvocab.domain.model.AppMode
 import com.example.visualvocab.domain.model.DetectionResult
-import com.example.visualvocab.domain.model.SentenceDifficulty
-import com.example.visualvocab.domain.model.Vocabulary
 import com.example.visualvocab.feature.vocab.presentation.EditableTrainingAnnotation
 import com.example.visualvocab.feature.vocab.presentation.VocabUiEvent
 import com.example.visualvocab.feature.vocab.presentation.VocabViewModel
 import com.example.visualvocab.feature.vocab.ui.components.DetectionOverlay
 import com.example.visualvocab.feature.vocab.ui.components.ImagePickerContent
+import com.example.visualvocab.feature.vocab.ui.components.VocabularyCard
 
 @Composable
 fun VisualVocabScreen(
@@ -255,7 +251,7 @@ fun VisualVocabScreen(
                                                     Color.Black
                                                         .copy(
                                                             alpha =
-                                                                0.46f
+                                                                0.18f
                                                         ),
                                             0.16f to
                                                     Color.Transparent,
@@ -265,7 +261,7 @@ fun VisualVocabScreen(
                                                     Color.Black
                                                         .copy(
                                                             alpha =
-                                                                0.78f
+                                                                0.34f
                                                         )
                                         )
                                 )
@@ -283,6 +279,25 @@ fun VisualVocabScreen(
                             bitmap.height,
                         useCropScale = true
                     )
+
+                    AnimatedVisibility(
+                        visible =
+                            uiState.hasSelectedObject &&
+                                    uiState.appMode ==
+                                    AppMode.LEARN,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Color.Black.copy(
+                                        alpha = 0.26f
+                                    )
+                                )
+                        )
+                    }
 
                     HeaderControls(
                         mode = uiState.appMode,
@@ -363,15 +378,34 @@ fun VisualVocabScreen(
                             isExporting =
                                 uiState
                                     .isExportingTrainingDataset,
+                            isUploading =
+                                uiState
+                                    .isUploadingTrainingDataset,
                             onSave = {
                                 viewModel.onEvent(
                                     VocabUiEvent
                                         .SaveTrainingExample
                                 )
                             },
+                            currentModelVersion =
+                                uiState.currentModelVersion,
+                            isCheckingModelUpdate =
+                                uiState.isCheckingModelUpdate,
+                            onCheckForModelUpdate = {
+                                viewModel.onEvent(
+                                    VocabUiEvent
+                                        .CheckForModelUpdate
+                                )
+                            },
                             onExport = {
                                 exportLauncher.launch(
                                     "visual_vocab_dataset.zip"
+                                )
+                            },
+                            onUpload = {
+                                viewModel.onEvent(
+                                    VocabUiEvent
+                                        .UploadTrainingDataset
                                 )
                             },
                             modifier = Modifier
@@ -422,21 +456,30 @@ fun VisualVocabScreen(
                                     AppMode.LEARN,
                         enter =
                             fadeIn() +
+                                    scaleIn(
+                                        initialScale = 0.95f
+                                    ) +
                                     slideInVertically {
-                                        it / 3
+                                        it / 10
                                     },
                         exit =
                             fadeOut() +
+                                    scaleOut(
+                                        targetScale = 0.96f
+                                    ) +
                                     slideOutVertically {
-                                        it / 3
+                                        it / 12
                                     },
                         modifier = Modifier
                             .align(
-                                Alignment.BottomCenter
+                                Alignment.Center
+                            )
+                            .padding(
+                                horizontal = 18.dp
                             )
                             .zIndex(5f)
                     ) {
-                        VocabularySheet(
+                        VocabularyCard(
                             vocabulary =
                                 uiState.vocabulary,
                             difficulty =
@@ -472,7 +515,9 @@ fun VisualVocabScreen(
                     }
 
                     (
-                            uiState.trainingMessage
+                            uiState.datasetUploadMessage
+                                ?: uiState.modelUpdateMessage
+                                ?: uiState.trainingMessage
                                 ?: uiState.errorMessage
                             )
                         ?.takeIf {
@@ -570,6 +615,101 @@ fun VisualVocabScreen(
                 )
             }
     }
+    uiState.availableModelManifest
+        ?.let { manifest ->
+            AlertDialog(
+                onDismissRequest = {
+                    viewModel.onEvent(
+                        VocabUiEvent
+                            .DismissModelUpdate
+                    )
+                },
+                title = {
+                    Text(
+                        "Model ${manifest.version} available"
+                    )
+                },
+                text = {
+                    Column {
+                        if (
+                            manifest.releaseNotes
+                                .isNotBlank()
+                        ) {
+                            Text(
+                                manifest.releaseNotes
+                            )
+
+                            Spacer(
+                                Modifier.height(8.dp)
+                            )
+                        }
+
+                        if (
+                            manifest.downloadSizeBytes > 0
+                        ) {
+                            Text(
+                                text =
+                                    "Download size: " +
+                                            String.format(
+                                                "%.1f MB",
+                                                manifest.downloadSizeBytes /
+                                                        1_000_000.0
+                                            ),
+                                style =
+                                    MaterialTheme.typography
+                                        .bodySmall
+                            )
+                        }
+
+                        if (
+                            uiState.isInstallingModelUpdate
+                        ) {
+                            Spacer(
+                                Modifier.height(14.dp)
+                            )
+
+                            CircularProgressIndicator(
+                                modifier =
+                                    Modifier.align(
+                                        Alignment.CenterHorizontally
+                                    )
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.onEvent(
+                                VocabUiEvent
+                                    .InstallAvailableModelUpdate
+                            )
+                        },
+                        enabled =
+                            !uiState
+                                .isInstallingModelUpdate
+                    ) {
+                        Text("Download and install")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.onEvent(
+                                VocabUiEvent
+                                    .DismissModelUpdate
+                            )
+                        },
+                        enabled =
+                            !uiState
+                                .isInstallingModelUpdate
+                    ) {
+                        Text("Not now")
+                    }
+                }
+            )
+        }
+
 }
 
 @Composable
@@ -733,8 +873,13 @@ private fun TeachControls(
     exampleCount: Int,
     isSaving: Boolean,
     isExporting: Boolean,
+    isUploading: Boolean,
+    currentModelVersion: String,
+    isCheckingModelUpdate: Boolean,
     onSave: () -> Unit,
+    onCheckForModelUpdate: () -> Unit,
     onExport: () -> Unit,
+    onUpload: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -766,8 +911,55 @@ private fun TeachControls(
             )
 
             Spacer(
+                Modifier.height(5.dp)
+            )
+
+            Text(
+                text =
+                    "Model $currentModelVersion",
+                style =
+                    MaterialTheme.typography
+                        .labelSmall,
+                color =
+                    Color.White.copy(
+                        alpha = 0.62f
+                    )
+            )
+
+            Spacer(
                 Modifier.height(9.dp)
             )
+
+            TextButton(
+                onClick =
+                    onCheckForModelUpdate,
+                enabled =
+                    !isCheckingModelUpdate &&
+                            !isSaving &&
+                            !isExporting &&
+                            !isUploading
+            ) {
+                if (
+                    isCheckingModelUpdate
+                ) {
+                    CircularProgressIndicator(
+                        modifier =
+                            Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                }
+
+                Text(
+                    text =
+                        if (
+                            isCheckingModelUpdate
+                        ) {
+                            " Checking…"
+                        } else {
+                            "Check model update"
+                        }
+                )
+            }
 
             Row(
                 horizontalArrangement =
@@ -778,7 +970,8 @@ private fun TeachControls(
                     enabled =
                         confirmedCount > 0 &&
                                 !isSaving &&
-                                !isExporting
+                                !isExporting &&
+                                !isUploading
                 ) {
                     if (isSaving) {
                         CircularProgressIndicator(
@@ -807,7 +1000,8 @@ private fun TeachControls(
                     enabled =
                         exampleCount > 0 &&
                                 !isSaving &&
-                                !isExporting
+                                !isExporting &&
+                                !isUploading
                 ) {
                     if (isExporting) {
                         CircularProgressIndicator(
@@ -830,6 +1024,48 @@ private fun TeachControls(
 
                     Text("Export ZIP")
                 }
+            }
+
+            Spacer(
+                Modifier.height(8.dp)
+            )
+
+            OutlinedButton(
+                onClick = onUpload,
+                enabled =
+                    exampleCount > 0 &&
+                            !isSaving &&
+                            !isExporting &&
+                            !isUploading,
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+                if (isUploading) {
+                    CircularProgressIndicator(
+                        modifier =
+                            Modifier.size(17.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector =
+                            Icons.Default.CloudUpload,
+                        contentDescription =
+                            null
+                    )
+                }
+
+                Spacer(
+                    Modifier.size(7.dp)
+                )
+
+                Text(
+                    if (isUploading) {
+                        "Uploading…"
+                    } else {
+                        "Upload dataset"
+                    }
+                )
             }
         }
     }
@@ -989,335 +1225,6 @@ private fun ErrorPill(
 }
 
 @Composable
-private fun VocabularySheet(
-    vocabulary: Vocabulary?,
-    difficulty:
-    SentenceDifficulty,
-    isGenerating: Boolean,
-    onRegenerate: () -> Unit,
-    onMakeEasier: () -> Unit,
-    onMakeHarder: () -> Unit,
-    onClose: () -> Unit
-) {
-    var horizontalDrag by remember {
-        mutableFloatStateOf(0f)
-    }
-
-    ElevatedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pointerInput(
-                vocabulary
-                    ?.englishSentence,
-                difficulty,
-                isGenerating
-            ) {
-                detectHorizontalDragGestures(
-                    onDragStart = {
-                        horizontalDrag = 0f
-                    },
-                    onHorizontalDrag = {
-                            change,
-                            dragAmount ->
-
-                        change.consume()
-                        horizontalDrag +=
-                            dragAmount
-                    },
-                    onDragEnd = {
-                        if (!isGenerating) {
-                            when {
-                                horizontalDrag >=
-                                        SWIPE_THRESHOLD ->
-                                    onMakeEasier()
-
-                                horizontalDrag <=
-                                        -SWIPE_THRESHOLD ->
-                                    onMakeHarder()
-                            }
-                        }
-
-                        horizontalDrag = 0f
-                    },
-                    onDragCancel = {
-                        horizontalDrag = 0f
-                    }
-                )
-            },
-        shape = RoundedCornerShape(
-            topStart = 30.dp,
-            topEnd = 30.dp
-        ),
-        colors =
-            CardDefaults
-                .elevatedCardColors(
-                    containerColor =
-                        MaterialTheme
-                            .colorScheme
-                            .surface
-                            .copy(
-                                alpha = 0.97f
-                            )
-                ),
-        elevation =
-            CardDefaults
-                .elevatedCardElevation(
-                    defaultElevation =
-                        18.dp
-                )
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(
-                    WindowInsets.navigationBars
-                )
-        ) {
-            IconButton(
-                onClick = onClose,
-                modifier = Modifier
-                    .align(
-                        Alignment.TopEnd
-                    )
-                    .padding(
-                        top = 10.dp,
-                        end = 12.dp
-                    )
-            ) {
-                Icon(
-                    imageVector =
-                        Icons.Default.Clear,
-                    contentDescription =
-                        "Close"
-                )
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = 26.dp,
-                        end = 26.dp,
-                        top = 16.dp,
-                        bottom = 20.dp
-                    ),
-                horizontalAlignment =
-                    Alignment.CenterHorizontally
-            ) {
-                Surface(
-                    modifier = Modifier.size(
-                        width = 42.dp,
-                        height = 4.dp
-                    ),
-                    shape = CircleShape,
-                    color =
-                        MaterialTheme
-                            .colorScheme
-                            .outline
-                            .copy(
-                                alpha = 0.42f
-                            )
-                ) {}
-
-                Spacer(
-                    Modifier.height(16.dp)
-                )
-
-                Surface(
-                    shape = CircleShape,
-                    color =
-                        MaterialTheme
-                            .colorScheme
-                            .primaryContainer
-                ) {
-                    Text(
-                        text =
-                            when (difficulty) {
-                                SentenceDifficulty
-                                    .EASY ->
-                                    "EASY"
-
-                                SentenceDifficulty
-                                    .MEDIUM ->
-                                    "MEDIUM"
-
-                                SentenceDifficulty
-                                    .HARD ->
-                                    "HARD"
-                            },
-                        modifier =
-                            Modifier.padding(
-                                horizontal =
-                                    12.dp,
-                                vertical =
-                                    6.dp
-                            ),
-                        style =
-                            MaterialTheme
-                                .typography
-                                .labelSmall,
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-                }
-
-                Spacer(
-                    Modifier.height(14.dp)
-                )
-
-                if (vocabulary != null) {
-                    Text(
-                        text =
-                            vocabulary
-                                .englishWord
-                                .replaceFirstChar {
-                                    it.uppercase()
-                                },
-                        style =
-                            MaterialTheme
-                                .typography
-                                .headlineMedium,
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-
-                    Spacer(
-                        Modifier.height(3.dp)
-                    )
-
-                    Text(
-                        text =
-                            vocabulary
-                                .spanishWord,
-                        style =
-                            MaterialTheme
-                                .typography
-                                .titleMedium,
-                        color =
-                            MaterialTheme
-                                .colorScheme
-                                .primary
-                    )
-                }
-
-                Spacer(
-                    Modifier.height(18.dp)
-                )
-
-                Crossfade(
-                    targetState =
-                        if (isGenerating) {
-                            null
-                        } else {
-                            vocabulary
-                        },
-                    label = "sentence"
-                ) { displayedVocabulary ->
-                    if (
-                        displayedVocabulary ==
-                        null
-                    ) {
-                        CircularProgressIndicator(
-                            modifier =
-                                Modifier.size(
-                                    28.dp
-                                ),
-                            strokeWidth = 2.5.dp
-                        )
-                    } else {
-                        Column(
-                            horizontalAlignment =
-                                Alignment
-                                    .CenterHorizontally
-                        ) {
-                            Text(
-                                text =
-                                    displayedVocabulary
-                                        .englishSentence,
-                                style =
-                                    MaterialTheme
-                                        .typography
-                                        .bodyLarge,
-                                fontWeight =
-                                    FontWeight
-                                        .Medium,
-                                textAlign =
-                                    TextAlign.Center
-                            )
-
-                            Spacer(
-                                Modifier.height(
-                                    9.dp
-                                )
-                            )
-
-                            Text(
-                                text =
-                                    displayedVocabulary
-                                        .spanishSentence,
-                                style =
-                                    MaterialTheme
-                                        .typography
-                                        .bodyMedium,
-                                textAlign =
-                                    TextAlign.Center,
-                                color =
-                                    MaterialTheme
-                                        .colorScheme
-                                        .primary
-                            )
-                        }
-                    }
-                }
-
-                Spacer(
-                    Modifier.height(18.dp)
-                )
-
-                Text(
-                    text =
-                        "← harder   swipe   easier →",
-                    style =
-                        MaterialTheme
-                            .typography
-                            .labelSmall
-                )
-
-                Spacer(
-                    Modifier.height(6.dp)
-                )
-
-                TextButton(
-                    onClick =
-                        onRegenerate,
-                    enabled =
-                        !isGenerating
-                ) {
-                    Icon(
-                        imageVector =
-                            Icons.Default.Refresh,
-                        contentDescription =
-                            null,
-                        modifier =
-                            Modifier.size(
-                                17.dp
-                            )
-                    )
-
-                    Spacer(
-                        Modifier.size(7.dp)
-                    )
-
-                    Text(
-                        "Another sentence"
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun OverlappingDetectionsDialog(
     detections:
     List<DetectionResult>,
@@ -1364,6 +1271,3 @@ private fun OverlappingDetectionsDialog(
         }
     )
 }
-
-private const val SWIPE_THRESHOLD =
-    90f
