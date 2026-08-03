@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
+// a simple loading screen we show while vivi is thinking or saving things.
 @Composable
 fun ProcessingOverlay(
     message: String

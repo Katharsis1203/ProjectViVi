@@ -14,6 +14,7 @@ import java.io.FileInputStream
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 
+// this manager handles running the YOLO model using the TensorFlow Lite interpreter.
 class YoloObjectDetectorManager(
     context: Context,
     private val modelProvider:
@@ -28,15 +29,18 @@ class YoloObjectDetectorManager(
     private val appContext =
         context.applicationContext
 
+    // figure out if we are using the built-in model or a new one we downloaded.
     private val activeSource =
         modelProvider.getActiveSource()
 
+    // load the list of labels for this model.
     private val metadata =
         YoloModelMetadata.load(
             appContext,
             activeSource
         )
 
+    // the actual engine that runs the model.
     private val interpreter =
         Interpreter(
             loadMappedModel(
@@ -55,6 +59,7 @@ class YoloObjectDetectorManager(
     private val outputTensor =
         interpreter.getOutputTensor(0)
 
+    // get info about what the model expects as input.
     private val inputInfo =
         resolveInputInfo(
             tensor = inputTensor,
@@ -71,12 +76,14 @@ class YoloObjectDetectorManager(
     private val outputShape =
         outputTensor.shape()
 
+    // this gets the image ready for the model.
     private val preprocessor =
         YoloImagePreprocessor(
             inputSize = inputSize,
             dataLayout = dataLayout
         )
 
+    // this turns the model's output back into a list of things it found.
     private val decoder =
         YoloOutputDecoder(
             classNames =
@@ -88,6 +95,7 @@ class YoloObjectDetectorManager(
         )
 
     init {
+        // make sure the model is actually compatible with what we expect.
         require(
             inputTensor.dataType()
                 .toString() ==
@@ -126,6 +134,7 @@ class YoloObjectDetectorManager(
         }
     }
 
+    // this is the main function to find objects in a picture.
     @Synchronized
     fun detect(
         bitmap: Bitmap
@@ -133,6 +142,7 @@ class YoloObjectDetectorManager(
         val prepared =
             preprocessor.process(bitmap)
 
+        // allocate space for the model's results.
         val output =
             Array(outputShape[0]) {
                 Array(outputShape[1]) {
@@ -142,11 +152,13 @@ class YoloObjectDetectorManager(
                 }
             }
 
+        // actually run the model.
         interpreter.run(
             prepared.buffer,
             output
         )
 
+        // decode the raw numbers into a nice list of results.
         return decoder.decode(
             output = output,
             tensorShape = outputShape,
@@ -154,6 +166,7 @@ class YoloObjectDetectorManager(
         )
     }
 
+    // just a helper to see what model we are using.
     fun describeModel(): String {
         return buildString {
             append("version=")
@@ -188,6 +201,7 @@ class YoloObjectDetectorManager(
         }
     }
 
+    // clean up when we are done.
     override fun close() {
         interpreter.close()
     }
@@ -199,6 +213,7 @@ class YoloObjectDetectorManager(
         .DataLayout
     )
 
+    // check if the model's input shape makes sense to us.
     private fun resolveInputInfo(
         tensor: Tensor,
         metadataInputSize: Int
@@ -213,6 +228,7 @@ class YoloObjectDetectorManager(
             "Unexpected YOLO input shape: ${shape.contentToString()}."
         }
 
+        // figure out if it wants colors first or pixel positions first.
         val layout =
             when {
                 shape[3] == 3 ->
@@ -274,6 +290,7 @@ class YoloObjectDetectorManager(
         )
     }
 
+    // helper to map the model file into memory so it runs faster.
     private fun loadMappedModel(
         context: Context,
         source: YoloModelSource

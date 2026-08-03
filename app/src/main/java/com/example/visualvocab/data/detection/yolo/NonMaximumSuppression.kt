@@ -5,8 +5,10 @@ import com.example.visualvocab.domain.model.DetectionResult
 import kotlin.math.max
 import kotlin.math.min
 
+// this object helps us clean up the detection list by removing boxes that overlap too much.
 internal object NonMaximumSuppression {
 
+    // filter out the boxes that are mostly the same thing.
     fun apply(
         detections:
             List<DetectionResult>,
@@ -19,6 +21,7 @@ internal object NonMaximumSuppression {
         val results =
             mutableListOf<DetectionResult>()
 
+        // we do this for each type of object separately.
         detections
             .groupBy {
                 it.label
@@ -42,6 +45,7 @@ internal object NonMaximumSuppression {
 
                     results += best
 
+                    // remove any other boxes that overlap a lot with the best one.
                     remaining.removeAll {
                         intersectionOverUnion(
                             best.boundingBox,
@@ -57,6 +61,7 @@ internal object NonMaximumSuppression {
             }
     }
 
+    // calculate how much two boxes overlap, from 0 to 1.
     fun intersectionOverUnion(
         first: RectF,
         second: RectF

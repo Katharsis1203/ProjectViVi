@@ -14,30 +14,38 @@ import com.example.visualvocab.domain.usecase.DetectObjectsUseCase
 import com.example.visualvocab.domain.usecase.GenerateVocabularyUseCase
 import com.example.visualvocab.domain.usecase.RegenerateSentenceUseCase
 
+// this class is like a big container for all the things the app needs to work.
+// it makes sure we don't have to keep creating new stuff all the time.
 class AppModule(private val context: Context) {
 
     private val dispatchers by lazy { AppDispatchers() }
 
+    // this one helps us load pictures from the phone's memory.
     val bitmapLoader by lazy {
         BitmapLoader(context, dispatchers)
     }
 
+    // groq is the smart AI thing we use for translating words.
     private val groqManager by lazy {
         GroqManager(BuildConfig.GROQ_API_KEY)
     }
 
+    // this manages how we talk to the AI to get new words.
     private val vocabularyRepository: VocabularyRepository by lazy {
         VocabularyRepositoryImpl(groqManager)
     }
 
+    // this is for the camera and finding objects in photos.
     private val objectDetectorManager by lazy {
         ObjectDetectorManager(context)
     }
 
+    // repo that puts together the detection stuff for us to use.
     private val detectionRepository: DetectionRepository by lazy {
         DetectionRepositoryImpl(context, objectDetectorManager)
     }
 
+    // these usecases are the actual actions the UI can do.
     val detectObjectsUseCase by lazy {
         DetectObjectsUseCase(detectionRepository)
     }

@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 
+// this repository handles finding things in photos using all our detectors.
 class DetectionRepositoryImpl(
     context: Context,
     private val objectDetectorManager:
@@ -24,6 +25,7 @@ class DetectionRepositoryImpl(
     private val appContext =
         context.applicationContext
 
+    // we try to set up the YOLO detector, but it might not work on all phones.
     private val yoloDetectorManager =
         try {
             YoloObjectDetectorManager(
@@ -33,6 +35,7 @@ class DetectionRepositoryImpl(
             null
         }
 
+    // we use a combined manager to handle both detectors at once.
     private val combinedDetectorManager =
         CombinedObjectDetectorManager(
             efficientDetector =
@@ -41,16 +44,19 @@ class DetectionRepositoryImpl(
                 yoloDetectorManager
         )
 
+    // settings for the image labeler.
     private val labelerOptions =
         ImageLabelerOptions.Builder()
             .setConfidenceThreshold(0.5f)
             .build()
 
+    // ML Kit labeler for general categorization.
     private val labeler =
         ImageLabeling.getClient(
             labelerOptions
         )
 
+    // detect objects and their positions in the picture.
     override fun detectObjects(
         bitmap: Bitmap
     ): Flow<List<DetectionResult>> =
@@ -66,6 +72,7 @@ class DetectionRepositoryImpl(
             emit(detections)
         }
 
+    // just label the whole image without worrying about where things are.
     override fun labelImage(
         bitmap: Bitmap
     ): Flow<List<String>> =
@@ -80,6 +87,7 @@ class DetectionRepositoryImpl(
                 .addOnSuccessListener {
                         labels ->
 
+                    // get the top 10 labels that look good.
                     val result =
                         labels
                             .sortedByDescending {

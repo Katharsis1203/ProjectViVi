@@ -44,6 +44,7 @@ import com.example.visualvocab.ui.theme.NightSurface
 import com.example.visualvocab.ui.theme.NightText
 import com.example.visualvocab.ui.theme.QuestGold
 
+// this is what you see when you haven't picked a photo yet. it has big buttons to open the gallery.
 @Composable
 fun ImagePickerContent(
     onSelectImage: () -> Unit,
@@ -115,7 +116,7 @@ fun ImagePickerContent(
                 Spacer(Modifier.height(8.dp))
 
                 Text(
-                    text = if (isTeachMode) "Teach Vivi something new" else "What can you discover?",
+                    text = if (isTeachMode) "Teach vivi something new" else "What can you discover?",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = NightText,
@@ -143,6 +144,7 @@ fun ImagePickerContent(
 
                 Spacer(Modifier.height(24.dp))
 
+                // the big main button to open the photo picker.
                 Button(
                     onClick = onSelectImage,
                     modifier = Modifier
@@ -163,6 +165,7 @@ fun ImagePickerContent(
                     )
                 }
 
+                // if we are in learning mode, show a link to the teaching mode.
                 if (!isTeachMode) {
                     onOpenCreatorStudio?.let { openCreatorStudio ->
                         Spacer(Modifier.height(12.dp))

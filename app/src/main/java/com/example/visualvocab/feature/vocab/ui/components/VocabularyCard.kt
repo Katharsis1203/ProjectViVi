@@ -56,6 +56,7 @@ import com.example.visualvocab.ui.theme.QuestGold
 import com.example.visualvocab.ui.theme.QuestGoldSoft
 import com.example.visualvocab.ui.theme.SuccessGreen
 
+// this is the card that pops up with a question or shows you the translation of an object.
 @Composable
 fun VocabularyCard(
     vocabulary: Vocabulary?,
@@ -87,6 +88,7 @@ fun VocabularyCard(
             modifier = Modifier.padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // shows progress through the current quest.
             LessonHeader(
                 questionNumber = questionNumber,
                 questionTotal = questionTotal,
@@ -94,13 +96,14 @@ fun VocabularyCard(
                 onClose = onClose
             )
 
+            // check what to show inside the card.
             when {
-                isGenerating -> LoadingContent()
-                !generationError.isNullOrBlank() && vocabulary == null -> ErrorContent(
+                isGenerating -> LoadingContent() // vivi is thinking
+                !generationError.isNullOrBlank() && vocabulary == null -> ErrorContent( // something went wrong
                     message = generationError,
                     onRetry = onRetry
                 )
-                vocabulary != null -> QuestionContent(
+                vocabulary != null -> QuestionContent( // here is the actual challenge
                     vocabulary = vocabulary,
                     questionType = questionType,
                     prompt = prompt,
@@ -427,7 +430,7 @@ fun LessonCompleteCard(
     CompletionCard(
         title = "Quest complete!",
         subtitle = if (correctAnswers == totalQuestions && totalQuestions > 0) {
-            "Perfect score — Vivi is impressed."
+            "Perfect score — vivi is impressed."
         } else {
             "$correctAnswers of $totalQuestions correct"
         },

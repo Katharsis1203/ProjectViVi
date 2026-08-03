@@ -18,6 +18,7 @@ import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
+// this repository handles saving and exporting images and labels for training our AI.
 class TrainingRepositoryImpl(
     context: Context
 ) : TrainingRepository {
@@ -32,6 +33,7 @@ class TrainingRepositoryImpl(
             ignoreUnknownKeys = true
         }
 
+    // main folder for training data.
     private val rootDirectory: File
         get() =
             File(
@@ -39,6 +41,7 @@ class TrainingRepositoryImpl(
                 TRAINING_DIRECTORY
             )
 
+    // folder where we store the photos.
     private val imageDirectory: File
         get() =
             File(
@@ -46,6 +49,7 @@ class TrainingRepositoryImpl(
                 IMAGE_DIRECTORY
             )
 
+    // file that keeps track of all the metadata.
     private val metadataFile: File
         get() =
             File(
@@ -53,11 +57,13 @@ class TrainingRepositoryImpl(
                 METADATA_FILE
             )
 
+    // save a new photo and its labels to the phone.
     override suspend fun saveExample(
         bitmap: Bitmap,
         annotations:
         List<TrainingAnnotation>
     ) = withContext(Dispatchers.IO) {
+        // we need at least one label to save anything.
         require(
             annotations.isNotEmpty()
         ) {
@@ -79,6 +85,7 @@ class TrainingRepositoryImpl(
                 imageFileName
             )
 
+        // save the bitmap as a JPEG file.
         imageFile
             .outputStream()
             .use { output ->
@@ -97,6 +104,7 @@ class TrainingRepositoryImpl(
         val dataset =
             readDataset()
 
+        // create the metadata for this example.
         val storedExample =
             StoredTrainingExample(
                 id = exampleId,
@@ -129,6 +137,7 @@ class TrainingRepositoryImpl(
                     }
             )
 
+        // update the main dataset file.
         writeDataset(
             dataset.copy(
                 examples =
@@ -138,6 +147,7 @@ class TrainingRepositoryImpl(
         )
     }
 
+    // get all the examples we have saved so far.
     override suspend fun getExamples(): List<AnnotatedExample> = withContext(Dispatchers.IO) {
         readDataset().examples.map { stored ->
             AnnotatedExample(
@@ -161,6 +171,7 @@ class TrainingRepositoryImpl(
         }
     }
 
+    // delete an example and its photo.
     override suspend fun deleteExample(id: String) = withContext(Dispatchers.IO) {
         val dataset = readDataset()
         val example = dataset.examples.find { it.id == id } ?: return@withContext
@@ -177,6 +188,7 @@ class TrainingRepositoryImpl(
         )
     }
 
+    // bundle all the examples into a ZIP file to upload.
     override suspend fun exportDataset(
         outputStream: OutputStream
     ) = withContext(Dispatchers.IO) {
@@ -189,6 +201,7 @@ class TrainingRepositoryImpl(
             "No training examples have been saved."
         }
 
+        // find all the unique labels we've used.
         val classNames =
             dataset.examples
                 .flatMap {
@@ -255,6 +268,7 @@ class TrainingRepositoryImpl(
                 classNames
             )
 
+        // start building the ZIP file.
         ZipOutputStream(
             outputStream.buffered()
         ).use { zip ->
@@ -267,6 +281,7 @@ class TrainingRepositoryImpl(
                         example.imageFileName
                     )
 
+                // add the photo to the ZIP.
                 writeFileEntry(
                     zip = zip,
                     entryName =
@@ -281,6 +296,7 @@ class TrainingRepositoryImpl(
                         ) +
                             ".txt"
 
+                // create and add the YOLO format label file.
                 val labelText =
                     createYoloLabelText(
                         example =
@@ -298,6 +314,7 @@ class TrainingRepositoryImpl(
                 )
             }
 
+            // add the configuration files for training.
             writeTextEntry(
                 zip = zip,
                 entryName =
@@ -326,6 +343,7 @@ class TrainingRepositoryImpl(
                 .size
         }
 
+    // helper to format labels into the specific text format YOLO expects.
     private fun createYoloLabelText(
         example:
         StoredTrainingExample,
@@ -367,6 +385,7 @@ class TrainingRepositoryImpl(
                     val centerX = left + width / 2f
                     val centerY = top + height / 2f
 
+                    // format: class_id center_x center_y width height (all normalized 0-1)
                     String.format(
                         Locale.US,
                         "%d %.6f %.6f %.6f %.6f",
@@ -384,6 +403,7 @@ class TrainingRepositoryImpl(
         )
     }
 
+    // create the YAML configuration file for training.
     private fun createDatasetYaml(
         classNames:
         List<String>
@@ -412,6 +432,7 @@ class TrainingRepositoryImpl(
         }
     }
 
+    // helper to make sure strings are safe for YAML.
     private fun quoteYamlString(
         value: String
     ): String {
@@ -463,6 +484,7 @@ class TrainingRepositoryImpl(
         zip.closeEntry()
     }
 
+    // make labels consistent (lowercase, no extra spaces).
     private fun normalizeLabel(
         value: String
     ): String {
@@ -478,6 +500,7 @@ class TrainingRepositoryImpl(
         imageDirectory.mkdirs()
     }
 
+    // read all the saved example metadata from the JSON file.
     private fun readDataset():
             StoredDataset {
         ensureDirectories()
@@ -502,6 +525,7 @@ class TrainingRepositoryImpl(
         }
     }
 
+    // write all the example metadata back to the JSON file.
     private fun writeDataset(
         dataset: StoredDataset
     ) {

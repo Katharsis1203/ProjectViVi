@@ -23,6 +23,7 @@ import com.example.visualvocab.ui.theme.QuestGold
 import com.example.visualvocab.ui.theme.SuccessGreen
 import kotlin.math.abs
 
+// this overlay highlights objects in learning mode so the user knows what they can tap.
 @Composable
 fun DetectionOverlay(
     detections: List<DetectionResult>,
@@ -46,6 +47,7 @@ fun DetectionOverlay(
     Canvas(modifier = Modifier.fillMaxSize()) {
         if (imageWidth <= 0 || imageHeight <= 0) return@Canvas
 
+        // calculate scaling to match the photo.
         val widthScale = size.width / imageWidth.toFloat()
         val heightScale = size.height / imageHeight.toFloat()
         val scale = if (useCropScale) {
@@ -58,6 +60,7 @@ fun DetectionOverlay(
         val offsetY = (size.height - imageHeight * scale) / 2f
 
         detections.forEach { detection ->
+            // figure out where the box goes on the screen.
             val box = detection.boundingBox
             val left = box.left * scale + offsetX
             val top = box.top * scale + offsetY
@@ -68,6 +71,7 @@ fun DetectionOverlay(
             val isCorrectTarget = answerResult != null && detectionsMatch(detection, correctDetection)
             val isCompleted = completedDetections.any { detectionsMatch(detection, it) }
 
+            // use different colors based on if it's selected, correct, or already done.
             val outlineColor = when {
                 isSelected && answerResult == LessonAnswerResult.CORRECT -> SuccessGreen
                 isSelected && answerResult == LessonAnswerResult.INCORRECT -> FriendlyCoral
@@ -106,6 +110,7 @@ fun DetectionOverlay(
                 style = Stroke(width = strokeWidth)
             )
 
+            // don't show the name if we are playing "tap the object".
             if (!showLabels) return@forEach
 
             val objectName = detection.label

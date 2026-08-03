@@ -17,22 +17,26 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
+// this class is what we use to talk to the Groq AI service.
 class GroqManager(
     private val apiKey: String
 ) {
 
+    // we set up the HTTP client here with some timeouts so it doesn't wait forever.
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .writeTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
+    // setting up the JSON parser to be a bit more relaxed about what it sees.
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
         isLenient = true
     }
 
+    // this is the main function that asks the AI for words based on what we saw.
     suspend fun generateVocabulary(
         word: String,
         previousEnglishSentence: String?,
@@ -40,10 +44,12 @@ class GroqManager(
     ): VocabularyResultDto {
         val cleanedWord = word.trim().lowercase()
 
+        // make sure we actually have a word to look up.
         require(cleanedWord.isNotBlank()) {
             "The selected word is empty."
         }
 
+        // check if the API key is actually there.
         check(
             apiKey.isNotBlank() &&
                     apiKey != "YOUR_API_KEY_HERE"
@@ -51,6 +57,7 @@ class GroqManager(
             "The Groq API key has not been configured."
         }
 
+        // building the request to send to the AI.
         val requestBody = GroqRequestDto(
             model = MODEL_NAME,
             messages = listOf(
@@ -84,10 +91,12 @@ class GroqManager(
             )
             .build()
 
+        // actually sending the request and waiting for the answer.
         val responseText = withContext(Dispatchers.IO) {
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string()
 
+                // if the server says no, we throw an error.
                 if (!response.isSuccessful) {
                     val details = body
                         ?.take(300)
@@ -110,6 +119,7 @@ class GroqManager(
             }
         }
 
+        // turn the response into something we can use in the app.
         val groqResponse =
             json.decodeFromString<GroqResponseDto>(responseText)
 
@@ -134,6 +144,7 @@ class GroqManager(
         }
     }
 
+    // this part builds the message we send to the AI so it knows what to do.
     private fun createPrompt(
         word: String,
         previousSentence: String?,
@@ -147,6 +158,7 @@ class GroqManager(
             }
             .orEmpty()
 
+        // we tell the AI how hard the sentences should be.
         val difficultyInstruction = when (difficulty) {
             SentenceDifficulty.EASY -> """
                 Difficulty: EASY.
@@ -199,6 +211,7 @@ class GroqManager(
         """.trimIndent()
     }
 
+    // sometimes the AI puts its answer in a code block, so we have to clean that up.
     private fun String.removeMarkdownFence(): String {
         return trim()
             .removePrefix("```json")

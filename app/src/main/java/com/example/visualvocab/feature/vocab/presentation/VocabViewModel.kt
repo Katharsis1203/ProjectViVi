@@ -21,7 +21,6 @@ import com.example.visualvocab.domain.repository.TrainingRepository
 import com.example.visualvocab.domain.usecase.DetectObjectsUseCase
 import com.example.visualvocab.domain.usecase.GenerateVocabularyUseCase
 import com.example.visualvocab.domain.usecase.RegenerateSentenceUseCase
-import java.text.Normalizer
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -34,6 +33,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+// this is the big brain of our app. it handles all the logic for what you see on the screen.
+// it talks to the repositories and use cases to get work done.
 class VocabViewModel(
     private val bitmapLoader: BitmapLoader,
     private val detectObjectsUseCase: DetectObjectsUseCase,
@@ -45,9 +46,11 @@ class VocabViewModel(
     private val playerProgressStore: PlayerProgressStore
 ) : ViewModel() {
 
+    // load the player's saved progress when we start.
     private val initialPlayerProgress = runCatching { playerProgressStore.load() }
         .getOrDefault(PlayerProgress())
 
+    // the current state of our UI.
     private val _uiState = MutableStateFlow(
         VocabUiState(
             playerProgress = initialPlayerProgress,
@@ -56,18 +59,22 @@ class VocabViewModel(
     )
     val uiState: StateFlow<VocabUiState> = _uiState.asStateFlow()
 
+    // effects are one-time things like showing a snackbar error.
     private val _uiEffect = MutableSharedFlow<VocabUiEffect>()
     val uiEffect: SharedFlow<VocabUiEffect> = _uiEffect.asSharedFlow()
 
+    // keeping track of background jobs so we can cancel them if needed.
     private var imageLoadingJob: Job? = null
     private var detectionJob: Job? = null
     private var generationJob: Job? = null
     private var trainingJob: Job? = null
 
     init {
+        // check how many training examples we already have saved.
         refreshTrainingExampleCount()
     }
 
+    // this is the main way the UI tells us that something happened.
     fun onEvent(event: VocabUiEvent) {
         when (event) {
             is VocabUiEvent.ImageSelected -> handleImageSelected(event.uri)
@@ -147,6 +154,7 @@ class VocabViewModel(
         }
     }
 
+    // called when the user picks a new photo from their phone.
     private fun handleImageSelected(uri: Uri) {
         imageLoadingJob?.cancel()
         detectionJob?.cancel()
@@ -161,6 +169,7 @@ class VocabViewModel(
 
         imageLoadingJob = viewModelScope.launch {
             try {
+                // tell the UI we are busy loading.
                 _uiState.value = VocabUiState(
                     selectedImageUri = uri,
                     isDetecting = true,
@@ -196,6 +205,7 @@ class VocabViewModel(
                     isProgressLoaded = isProgressLoaded
                 )
 
+                // once it's loaded, start finding objects in it.
                 analyzeImage()
             } catch (exception: CancellationException) {
                 throw exception
@@ -212,12 +222,14 @@ class VocabViewModel(
         }
     }
 
+    // runs the object detection and image labeling.
     private fun analyzeImage() {
         val bitmap = _uiState.value.bitmap ?: return
 
         detectionJob?.cancel()
         generationJob?.cancel()
 
+        // reset the state before starting a new analysis.
         _uiState.update {
             it.copy(
                 detections = emptyList(),
@@ -271,6 +283,7 @@ class VocabViewModel(
                             }
                         )
                     }
+                    // start the first question automatically if we found things.
                     prepareAutomaticScanQuestion()
                 }
             } catch (exception: CancellationException) {
@@ -288,9 +301,11 @@ class VocabViewModel(
         }
     }
 
+    // handles what happens when a user clicks on an object in the picture.
     private fun handleObjectTapped(detection: DetectionResult) {
         val current = _uiState.value
 
+        // in teach mode, tapping adds a label for training.
         if (current.appMode == AppMode.TEACH) {
             addDetectionAnnotation(detection)
             return
@@ -298,10 +313,12 @@ class VocabViewModel(
 
         if (current.learningSessionMode != LearningSessionMode.SCAN) return
 
+        // if the question is "tap the object", check if they tapped the right one.
         if (
             current.lessonQuestionType == LessonQuestionType.TAP_OBJECT &&
             current.lessonTargetDetection != null &&
             current.vocabulary != null &&
+            current.lessonAnsweredCount < current.lessonTargetCount &&
             current.lessonAnswerResult == null
         ) {
             evaluateTapObjectAnswer(detection)
@@ -319,12 +336,13 @@ class VocabViewModel(
             return
         }
 
+        // decide what kind of question to ask based on how many objects we found.
         val questionType = questionTypeForScanIndex(
             index = current.lessonAnsweredCount,
             detectionCount = current.detections.size
         )
 
-        // Image-wide questions choose their target before the learner taps anything.
+        // image-wide questions choose their target before the learner taps anything.
         if (questionType == LessonQuestionType.TAP_OBJECT) {
             prepareAutomaticScanQuestion()
             return
@@ -336,6 +354,7 @@ class VocabViewModel(
         )
     }
 
+    // starts a new vocabulary question for the selected object.
     private fun startScanQuestion(
         detection: DetectionResult,
         questionType: LessonQuestionType
@@ -368,6 +387,7 @@ class VocabViewModel(
 
         generationJob = viewModelScope.launch {
             try {
+                // ask the AI for the translation and a sentence.
                 generateVocabularyUseCase(
                     word = word,
                     difficulty = SentenceDifficulty.MEDIUM
@@ -392,6 +412,7 @@ class VocabViewModel(
                         return@collect
                     }
 
+                    // create the multiple choice options.
                     val question = createQuestion(
                         type = questionType,
                         vocabulary = vocabulary,
@@ -427,6 +448,7 @@ class VocabViewModel(
         }
     }
 
+    // picks the next object to ask about automatically.
     private fun prepareAutomaticScanQuestion() {
         val current = _uiState.value
         if (
@@ -445,6 +467,7 @@ class VocabViewModel(
         )
         if (questionType != LessonQuestionType.TAP_OBJECT) return
 
+        // find an object we haven't asked about yet.
         val remainingDetections = current.detections.filterNot { candidate ->
             current.completedLessonDetections.any { completed ->
                 detectionKey(candidate) == detectionKey(completed)
@@ -458,6 +481,7 @@ class VocabViewModel(
         )
     }
 
+    // try the current question again if it failed to load.
     private fun retryLessonQuestion() {
         val current = _uiState.value
         if (
@@ -476,6 +500,7 @@ class VocabViewModel(
         }
     }
 
+    // updates the sentence difficulty and asks the AI for a new one.
     private fun changeDifficulty(makeHarder: Boolean) {
         val current = _uiState.value
         val vocabulary = current.vocabulary ?: return
@@ -493,6 +518,7 @@ class VocabViewModel(
         )
     }
 
+    // just asks for a new sentence with the same difficulty.
     private fun regenerateSentence() {
         val state = _uiState.value
         val vocabulary = state.vocabulary ?: return
@@ -503,6 +529,7 @@ class VocabViewModel(
         )
     }
 
+    // actually talks to the use case to get the new sentence.
     private fun regenerateSentence(
         word: String,
         previousSentence: String,
@@ -541,6 +568,7 @@ class VocabViewModel(
         }
     }
 
+    // deselects the current object and resets the question state.
     private fun clearSelectedObject() {
         generationJob?.cancel()
         generationJob = null
@@ -561,6 +589,7 @@ class VocabViewModel(
         }
     }
 
+    // called when the user clicks on one of the multiple choice answers.
     private fun selectLessonAnswer(answer: String) {
         val current = _uiState.value
         val vocabulary = current.vocabulary ?: return
@@ -583,6 +612,7 @@ class VocabViewModel(
         )
     }
 
+    // checks if the user tapped the right object in a "tap the object" question.
     private fun evaluateTapObjectAnswer(detection: DetectionResult) {
         val current = _uiState.value
         val vocabulary = current.vocabulary ?: return
@@ -596,6 +626,7 @@ class VocabViewModel(
         )
     }
 
+    // handles the result of an answer and updates the player's progress and XP.
     private fun submitAnswer(
         selectedAnswer: String,
         isCorrect: Boolean,
@@ -611,6 +642,7 @@ class VocabViewModel(
             LessonAnswerResult.INCORRECT
         }
 
+        // update mastery points and XP.
         val answerUpdate = updateProgressForAnswer(
             progress = current.playerProgress,
             vocabulary = vocabulary,
@@ -635,9 +667,11 @@ class VocabViewModel(
                 errorMessage = null
             )
         }
+        // save to disk so we don't lose progress.
         savePlayerProgress(answerUpdate.progress)
     }
 
+    // moves on to the next question in the lesson.
     private fun continueLesson() {
         val current = _uiState.value
         if (current.learningSessionMode != LearningSessionMode.SCAN) return
@@ -656,6 +690,7 @@ class VocabViewModel(
 
         var updatedProgress = current.playerProgress
         if (lessonComplete) {
+            // award bonus XP if they finished the whole lesson.
             val perfect = nextCorrectCount == current.lessonTargetCount
             val quests = updatedProgress.dailyQuests.normalized().copy(
                 perfectLessons = updatedProgress.dailyQuests.normalized().perfectLessons +
@@ -705,6 +740,7 @@ class VocabViewModel(
         }
     }
 
+    // resets the lesson so the user can try again.
     private fun restartLesson() {
         generationJob?.cancel()
         generationJob = null
@@ -738,9 +774,11 @@ class VocabViewModel(
         }
     }
 
+    // starts a review session for words that need practice.
     private fun startReview(wordKey: String? = null) {
         generationJob?.cancel()
         val progress = _uiState.value.playerProgress.normalizedForToday()
+        // figure out which words to review.
         val queue = when {
             !wordKey.isNullOrBlank() -> progress.words.filter { it.key == wordKey }
             else -> {
@@ -788,9 +826,11 @@ class VocabViewModel(
         prepareReviewQuestion(0)
     }
 
+    // sets up a single word for review.
     private fun prepareReviewQuestion(index: Int) {
         val state = _uiState.value
         val word = state.reviewQueue.getOrNull(index) ?: return
+        // switch between english and spanish questions.
         val type = if (index % 2 == 0) {
             LessonQuestionType.ENGLISH_TO_SPANISH
         } else {
@@ -819,6 +859,7 @@ class VocabViewModel(
         }
     }
 
+    // moves on to the next word in the review session.
     private fun continueReview() {
         val current = _uiState.value
         if (current.learningSessionMode != LearningSessionMode.REVIEW) return
@@ -830,6 +871,7 @@ class VocabViewModel(
         val complete = nextAnswered >= current.lessonTargetCount
 
         if (complete) {
+            // award final XP if they finished the whole review session.
             val quests = current.playerProgress.dailyQuests.normalized().let {
                 it.copy(reviewsCompleted = it.reviewsCompleted + 1)
             }
@@ -877,12 +919,14 @@ class VocabViewModel(
         }
     }
 
+    // lets the user restart the review if they want.
     private fun restartReview() {
         val current = _uiState.value
         val key = current.reviewQueue.singleOrNull()?.key
         startReview(key)
     }
 
+    // goes back to the normal scan mode after finishing a review.
     private fun endReview() {
         _uiState.update {
             it.copy(
@@ -908,6 +952,7 @@ class VocabViewModel(
         }
     }
 
+    // allows the user to manually edit the words they've saved.
     private fun updateSavedWord(wordKey: String, english: String, spanish: String) {
         val cleanEnglish = english.trim()
         val cleanSpanish = spanish.trim()
@@ -934,6 +979,7 @@ class VocabViewModel(
         savePlayerProgress(updated)
     }
 
+    // deletes a word from the user's collection.
     private fun deleteSavedWord(wordKey: String) {
         val progress = _uiState.value.playerProgress
         val updated = progress.copy(
@@ -943,6 +989,7 @@ class VocabViewModel(
         savePlayerProgress(updated)
     }
 
+    // marks that the user finished the onboarding process.
     private fun completeOnboarding() {
         val updated = _uiState.value.playerProgress.copy(
             onboardingCompleted = true
@@ -951,6 +998,7 @@ class VocabViewModel(
         savePlayerProgress(updated)
     }
 
+    // switches the whole UI between learning and teaching mode.
     private fun changeMode(mode: AppMode) {
         generationJob?.cancel()
         _uiState.update {
@@ -991,6 +1039,7 @@ class VocabViewModel(
         }
     }
 
+    // helper to suggest a random word for the user to find in teach mode.
     private fun pickRandomTargetWord(): String {
         val words = listOf(
             "stapler",
@@ -1004,12 +1053,12 @@ class VocabViewModel(
         return words.random()
     }
 
+    // in teach mode, takes an object found by the detector and turns it into a label we can edit.
     private fun addDetectionAnnotation(detection: DetectionResult) {
-        val existing = _uiState.value.editableTrainingAnnotations.firstOrNull { annotation ->
-            annotation.originalLabel == detection.label &&
-                    annotation.originalConfidence == detection.score &&
-                    boxesNearlyEqual(annotation.boundingBox, detection.boundingBox)
-        }
+        val existing = AnnotationRules.findMatchingDetectionAnnotation(
+            annotations = _uiState.value.editableTrainingAnnotations,
+            detection = detection
+        )
 
         if (existing != null) {
             _uiState.update { it.copy(selectedTrainingAnnotationId = existing.id) }
@@ -1033,16 +1082,7 @@ class VocabViewModel(
         }
     }
 
-    private fun boxesNearlyEqual(
-        first: RectF,
-        second: RectF,
-        tolerance: Float = 1f
-    ): Boolean =
-        kotlin.math.abs(first.left - second.left) <= tolerance &&
-                kotlin.math.abs(first.top - second.top) <= tolerance &&
-                kotlin.math.abs(first.right - second.right) <= tolerance &&
-                kotlin.math.abs(first.bottom - second.bottom) <= tolerance
-
+    // allows the user to manually draw a box around an object.
     private fun addManualAnnotation(
         left: Float,
         top: Float,
@@ -1072,6 +1112,7 @@ class VocabViewModel(
         }
     }
 
+    // updates the position and size of a label box.
     private fun updateAnnotationBox(
         id: String,
         left: Float,
@@ -1100,10 +1141,12 @@ class VocabViewModel(
         }
     }
 
+    // selects a label so the user can edit its name or delete it.
     private fun selectTrainingAnnotation(annotationId: String) {
         _uiState.update { it.copy(selectedTrainingAnnotationId = annotationId) }
     }
 
+    // updates what the user typed as the label name.
     private fun updateTrainingLabel(annotationId: String, label: String) {
         _uiState.update { state ->
             state.copy(
@@ -1118,6 +1161,7 @@ class VocabViewModel(
         }
     }
 
+    // marks a label as confirmed so it's ready to be saved.
     private fun confirmTrainingAnnotation(annotationId: String) {
         val annotation = _uiState.value.editableTrainingAnnotations
             .firstOrNull { it.id == annotationId }
@@ -1145,6 +1189,7 @@ class VocabViewModel(
         }
     }
 
+    // removes a label from the photo.
     private fun deleteTrainingAnnotation(annotationId: String) {
         _uiState.update { state ->
             state.copy(
@@ -1156,6 +1201,7 @@ class VocabViewModel(
         }
     }
 
+    // saves the whole photo and all its labels to the training dataset.
     private fun saveTrainingExample() {
         val state = _uiState.value
         val bitmap = state.bitmap ?: return
@@ -1176,6 +1222,7 @@ class VocabViewModel(
                     it.copy(isSavingTrainingExample = true, trainingMessage = null)
                 }
 
+                // convert box coordinates back to percentages for saving.
                 val annotations = confirmed.map { annotation ->
                     val box = annotation.boundingBox
                     TrainingAnnotation(
@@ -1221,6 +1268,7 @@ class VocabViewModel(
         }
     }
 
+    // exports all our training data to a ZIP file so we can send it somewhere.
     private fun exportTrainingDataset(destination: Uri) {
         trainingJob?.cancel()
         trainingJob = viewModelScope.launch {
@@ -1249,6 +1297,7 @@ class VocabViewModel(
         }
     }
 
+    // uploads all our saved training examples to the backend server.
     private fun uploadTrainingDataset() {
         if (_uiState.value.trainingExampleCount <= 0) {
             _uiState.update {
@@ -1306,6 +1355,7 @@ class VocabViewModel(
         val isNewWord: Boolean
     )
 
+    // internal helper to build the question text and options based on the question type.
     private fun createQuestion(
         type: LessonQuestionType,
         vocabulary: Vocabulary,
@@ -1348,37 +1398,22 @@ class VocabViewModel(
         correctAnswer: String,
         candidates: List<String>,
         spanish: Boolean
-    ): List<String> {
-        val cleanedAnswer = correctAnswer.trim()
-        val key: (String) -> String = if (spanish) ::answerConceptKey else ::normalizeAnswer
-        val correctKey = key(cleanedAnswer)
-        val distractors = candidates
-            .map(String::trim)
-            .filter(String::isNotBlank)
-            .shuffled()
-            .filter { key(it) != correctKey }
-            .distinctBy(key)
-            .take(LESSON_OPTION_COUNT - 1)
-        return (distractors + cleanedAnswer).shuffled()
-    }
+    ): List<String> = LearningRules.createOptions(
+        correctAnswer = correctAnswer,
+        candidates = candidates,
+        spanish = spanish,
+        optionCount = LESSON_OPTION_COUNT
+    )
 
     private fun questionTypeForScanIndex(
         index: Int,
         detectionCount: Int
-    ): LessonQuestionType {
-        val requested = when (index % 3) {
-            0 -> LessonQuestionType.ENGLISH_TO_SPANISH
-            1 -> LessonQuestionType.SPANISH_TO_ENGLISH
-            else -> LessonQuestionType.TAP_OBJECT
-        }
+    ): LessonQuestionType = LearningRules.questionTypeForScanIndex(
+        index = index,
+        detectionCount = detectionCount
+    )
 
-        return if (requested == LessonQuestionType.TAP_OBJECT && detectionCount < 2) {
-            LessonQuestionType.ENGLISH_TO_SPANISH
-        } else {
-            requested
-        }
-    }
-
+    // calculates how an answer changes the player's level and mastery of a word.
     private fun updateProgressForAnswer(
         progress: PlayerProgress,
         vocabulary: Vocabulary,
@@ -1391,6 +1426,7 @@ class VocabViewModel(
         val existingWord = normalizedProgress.words.firstOrNull { it.key == wordKey }
         val isNewWord = existingWord == null
         val previousMastery = existingWord?.masteryPoints ?: 0
+        // give or take points based on if they got it right.
         val nextMastery = if (correct) {
             (previousMastery + MASTERY_GAIN_CORRECT).coerceAtMost(MAX_MASTERY_POINTS)
         } else {
@@ -1413,6 +1449,7 @@ class VocabViewModel(
                 ?: System.currentTimeMillis()
         )
 
+        // keep track of how many they get right in a row.
         val nextCorrectStreak = if (correct) {
             normalizedProgress.currentCorrectStreak + 1
         } else {
@@ -1436,6 +1473,7 @@ class VocabViewModel(
             dailyQuests = updatedQuests
         )
 
+        // decide how much XP to give.
         val answerXp = when {
             !correct -> 0
             sessionMode == LearningSessionMode.REVIEW -> XP_REVIEW_CORRECT
@@ -1452,6 +1490,7 @@ class VocabViewModel(
         )
     }
 
+    // creates a unique string for an object based on its label and position.
     private fun detectionKey(detection: DetectionResult): String = buildString {
         append(detection.label.trim().lowercase(Locale.ROOT))
         append('|')
@@ -1465,25 +1504,13 @@ class VocabViewModel(
     }
 
     private fun answersMatch(first: String, second: String): Boolean =
-        normalizeAnswer(first) == normalizeAnswer(second) ||
-                answerConceptKey(first) == answerConceptKey(second)
+        LearningRules.answersMatch(first, second)
 
-    private fun answerConceptKey(answer: String): String {
-        val normalized = normalizeAnswer(answer)
-        val words = normalized.split(' ').filter(String::isNotBlank)
-        return if (words.firstOrNull() in SPANISH_ARTICLES) {
-            words.drop(1).joinToString(" ")
-        } else {
-            words.joinToString(" ")
-        }
-    }
+    private fun answerConceptKey(answer: String): String =
+        LearningRules.answerConceptKey(answer)
 
-    private fun normalizeAnswer(answer: String): String = Normalizer
-        .normalize(answer.trim().lowercase(Locale.ROOT), Normalizer.Form.NFD)
-        .replace(COMBINING_MARKS_REGEX, "")
-        .replace(NON_WORD_REGEX, " ")
-        .trim()
-        .replace(MULTIPLE_SPACES_REGEX, " ")
+    private fun normalizeAnswer(answer: String): String =
+        LearningRules.normalizeAnswer(answer)
 
     private fun refreshTrainingExampleCount() {
         viewModelScope.launch {
@@ -1497,42 +1524,13 @@ class VocabViewModel(
         runCatching { playerProgressStore.save(progress.withUnlockedAchievements()) }
     }
 
-    private fun awardXp(progress: PlayerProgress, amount: Int): PlayerProgress {
-        val today = DayKeys.today()
-        val normalized = progress.normalizedForToday(today)
-        if (amount <= 0) return normalized.withUnlockedAchievements()
+    private fun awardXp(progress: PlayerProgress, amount: Int): PlayerProgress =
+        LearningRules.awardXp(progress, amount)
 
-        val nextDailyXp = normalized.dailyXp + amount
-        val reachedGoalNow = normalized.dailyXp < normalized.dailyGoal &&
-                nextDailyXp >= normalized.dailyGoal
+    private fun reviewDelayDays(masteryPoints: Int): Int =
+        LearningRules.reviewDelayDays(masteryPoints)
 
-        val nextStreak = if (reachedGoalNow) {
-            when (normalized.lastGoalDay) {
-                today -> normalized.currentStreak
-                DayKeys.yesterday() -> normalized.currentStreak + 1
-                else -> 1
-            }
-        } else {
-            normalized.currentStreak
-        }
-
-        return normalized.copy(
-            totalXp = normalized.totalXp + amount,
-            dailyXp = nextDailyXp,
-            dailyXpDay = today,
-            currentStreak = nextStreak,
-            longestStreak = maxOf(normalized.longestStreak, nextStreak),
-            lastGoalDay = if (reachedGoalNow) today else normalized.lastGoalDay
-        ).withUnlockedAchievements()
-    }
-
-    private fun reviewDelayDays(masteryPoints: Int): Int = when {
-        masteryPoints >= 8 -> 7
-        masteryPoints >= 5 -> 4
-        masteryPoints >= 4 -> 2
-        else -> 1
-    }
-
+    // helper to make a word look nice by capitalizing the first letter.
     private fun String.displayWord(): String = trim().replaceFirstChar { character ->
         if (character.isLowerCase()) character.titlecase() else character.toString()
     }
@@ -1558,6 +1556,7 @@ class VocabViewModel(
             "el", "la", "los", "las", "un", "una", "unos", "unas"
         )
 
+        // a big list of words to use as wrong answers.
         val SPANISH_DISTRACTORS = listOf(
             "la mesa", "la silla", "la botella", "el libro", "la taza",
             "la puerta", "la ventana", "el teléfono", "el teclado", "el ratón",
@@ -1576,6 +1575,7 @@ class VocabViewModel(
         )
     }
 
+    // clean up all the background jobs when this view model is destroyed.
     override fun onCleared() {
         imageLoadingJob?.cancel()
         detectionJob?.cancel()

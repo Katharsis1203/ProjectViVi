@@ -29,6 +29,7 @@ enum class LessonQuestionType {
     TAP_OBJECT
 }
 
+// this big class stores everything the UI needs to know to show the right screen.
 data class VocabUiState(
     val selectedImageUri: Uri? = null,
     val bitmap: Bitmap? = null,
@@ -45,7 +46,7 @@ data class VocabUiState(
 
     val appMode: AppMode = AppMode.LEARN,
 
-    // Learn / Review session state
+    // stuff for the current lesson or review session.
     val learningSessionMode: LearningSessionMode = LearningSessionMode.SCAN,
     val lessonQuestionType: LessonQuestionType = LessonQuestionType.ENGLISH_TO_SPANISH,
     val lessonPrompt: String = "",
@@ -63,13 +64,13 @@ data class VocabUiState(
     val reviewQueue: List<WordProgress> = emptyList(),
     val reviewCurrentIndex: Int = 0,
 
-    // Persistent player progression
+    // persistent player progression
     val playerProgress: PlayerProgress = PlayerProgress(),
     val isProgressLoaded: Boolean = false,
     val recentXpAward: Int = 0,
     val xpAnimationToken: Long = 0L,
 
-    // Teach Mode / Annotation State
+    // stuff for teach mode where we label images.
     val targetWord: String? = null,
     val annotationTool: AnnotationTool = AnnotationTool.SELECT,
     val editableTrainingAnnotations: List<EditableTrainingAnnotation> = emptyList(),
@@ -79,10 +80,11 @@ data class VocabUiState(
     val isExportingTrainingDataset: Boolean = false,
     val trainingMessage: String? = null,
 
-    // Optional Upload
+    // optional upload
     val isUploadingTrainingDataset: Boolean = false,
     val datasetUploadMessage: String? = null
 ) {
+    // tells us if the app is busy doing something in the background.
     val isProcessing: Boolean
         get() = isDetecting ||
                 isGenerating ||
@@ -96,6 +98,7 @@ data class VocabUiState(
     val hasActiveQuestion: Boolean
         get() = vocabulary != null || isGenerating || lessonTargetDetection != null
 
+    // helper to show the current question number.
     val currentLessonQuestionNumber: Int
         get() = if (lessonTargetCount <= 0) {
             0

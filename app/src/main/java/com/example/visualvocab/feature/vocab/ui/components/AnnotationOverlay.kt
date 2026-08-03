@@ -30,6 +30,7 @@ import com.example.visualvocab.feature.vocab.presentation.EditableTrainingAnnota
 import java.util.Locale
 import kotlin.math.abs
 
+// this component lets users draw boxes on top of a photo to show vivi where things are.
 @Composable
 fun AnnotationOverlay(
     detections: List<DetectionResult>,
@@ -287,6 +288,7 @@ fun AnnotationOverlay(
                 useCropScale = useCropScale
             )
 
+            // here we draw labels for everything we've found or added.
             fun drawLabel(
                 text: String,
                 anchorLeft: Float,
@@ -333,6 +335,7 @@ fun AnnotationOverlay(
                 )
             }
 
+            // draw boxes that vivi's AI suggested.
             if (tool == AnnotationTool.SELECT) {
                 detections.forEach { detection ->
                     val box = detection.boundingBox
@@ -374,6 +377,7 @@ fun AnnotationOverlay(
                 }
             }
 
+            // draw boxes that the user added or edited themselves.
             annotations.forEach { annotation ->
                 val box = annotation.boundingBox
                 val left = box.left * transform.scale + transform.offsetX
@@ -434,6 +438,7 @@ fun AnnotationOverlay(
                 }
             }
 
+            // show the box while the user is still dragging their finger to create it.
             drawingRect?.let { rect ->
                 val sorted = RectF(rect).apply { sort() }
                 val left = sorted.left * transform.scale + transform.offsetX

@@ -9,6 +9,9 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
+// this file sets up the overall theme of our app, like the colors for light and dark mode.
+
+// settings for when the phone is in light mode.
 private val LightAppColorScheme = lightColorScheme(
     primary = ExplorerBlue,
     onPrimary = PureWhite,
@@ -44,6 +47,7 @@ private val LightAppColorScheme = lightColorScheme(
     scrim = NightInk
 )
 
+// settings for when the phone is in dark mode.
 private val DarkAppColorScheme = darkColorScheme(
     primary = ColorTokens.DarkPrimary,
     onPrimary = NightInk,
@@ -90,6 +94,7 @@ private object ColorTokens {
     val DarkErrorContainer = androidx.compose.ui.graphics.Color(0xFF7A2930)
 }
 
+// the main theme function that we use to wrap our whole app UI.
 @Composable
 fun VisualVocabTheme(
     darkTheme: Boolean = false,
@@ -99,6 +104,7 @@ fun VisualVocabTheme(
     val view = LocalView.current
     val colorScheme = if (darkTheme) DarkAppColorScheme else LightAppColorScheme
 
+    // set the status bar colors to match the app.
     if (!view.isInEditMode) {
         val window = (view.context as Activity).window
         window.statusBarColor = colorScheme.background.toArgb()

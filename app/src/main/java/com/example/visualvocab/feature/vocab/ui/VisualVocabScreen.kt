@@ -97,15 +97,18 @@ import com.example.visualvocab.ui.theme.CreatorPurple
 import com.example.visualvocab.ui.theme.NightInk
 import com.example.visualvocab.ui.theme.SuccessGreen
 
+// this is the main screen of the app that switches between all the other screens.
 @Composable
 fun VisualVocabScreen(viewModel: VocabViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    // keep track of which sub-screen we are on.
     var destination by rememberSaveable { mutableStateOf(VisualVocabDestination.HOME) }
     var selectedWordKey by rememberSaveable { mutableStateOf<String?>(null) }
     var reviewReturnDestination by rememberSaveable { mutableStateOf(VisualVocabDestination.HOME) }
     var creatorWorkspaceOpen by rememberSaveable { mutableStateOf(false) }
     val speaker = rememberVocabSpeaker()
 
+    // make sure the word detail screen closes if the word is deleted.
     LaunchedEffect(destination, selectedWordKey, uiState.playerProgress.words) {
         if (
             destination == VisualVocabDestination.WORD_DETAIL &&
@@ -116,6 +119,7 @@ fun VisualVocabScreen(viewModel: VocabViewModel) {
         }
     }
 
+    // picker for choosing photos from the phone's gallery.
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
@@ -127,6 +131,7 @@ fun VisualVocabScreen(viewModel: VocabViewModel) {
         }
     }
 
+    // launcher for saving the dataset ZIP file.
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
@@ -141,6 +146,7 @@ fun VisualVocabScreen(viewModel: VocabViewModel) {
 
     val isCreatorStudio = uiState.appMode == AppMode.TEACH
 
+    // automatically exit the workspace after saving a training example.
     LaunchedEffect(
         isCreatorStudio,
         creatorWorkspaceOpen,
@@ -235,6 +241,7 @@ fun VisualVocabScreen(viewModel: VocabViewModel) {
             )
         },
         bottomBar = {
+            // decide which bottom controls to show based on the mode.
             when {
                 isCreatorStudio &&
                         creatorWorkspaceOpen &&
@@ -281,6 +288,7 @@ fun VisualVocabScreen(viewModel: VocabViewModel) {
                 .padding(paddingValues)
                 .background(MaterialTheme.colorScheme.background)
         ) {
+            // choose which screen to show based on the destination and mode.
             when {
                 isCreatorStudio -> {
                     if (creatorWorkspaceOpen) {

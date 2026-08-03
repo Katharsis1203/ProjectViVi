@@ -6,6 +6,7 @@ import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 
+// this class turns the raw numbers from the YOLO model into something we can understand.
 internal class YoloOutputDecoder(
     private val classNames:
         List<String>,
@@ -14,6 +15,7 @@ internal class YoloOutputDecoder(
     private val nmsThreshold: Float
 ) {
 
+    // this is the main decoding function.
     fun decode(
         output: Array<Array<FloatArray>>,
         tensorShape: IntArray,
@@ -37,6 +39,7 @@ internal class YoloOutputDecoder(
             BOX_CHANNELS +
                 classNames.size
 
+        // figure out how the model packed its output data.
         val channelFirst =
             when {
                 firstDimension ==
@@ -76,6 +79,7 @@ internal class YoloOutputDecoder(
                 candidateCount
             )
 
+        // go through each thing the model thinks it found.
         for (
             candidateIndex in
             0 until candidateCount
@@ -90,6 +94,7 @@ internal class YoloOutputDecoder(
                 }
             }
 
+            // read the box coordinates.
             val centerX =
                 value(0)
 
@@ -105,6 +110,7 @@ internal class YoloOutputDecoder(
             var bestClassIndex = -1
             var bestScore = 0f
 
+            // find out which label matches best.
             classNames.indices
                 .forEach { classIndex ->
                     val score =
@@ -120,6 +126,7 @@ internal class YoloOutputDecoder(
                     }
                 }
 
+            // skip it if the score is too low or the box is weird.
             if (
                 bestClassIndex < 0 ||
                 bestScore <
@@ -130,10 +137,7 @@ internal class YoloOutputDecoder(
                 continue
             }
 
-            /*
-             * Ultralytics YOLO TFLite exports normally produce xywh values
-             * in model-input pixels. This also tolerates normalized xywh.
-             */
+            // sometimes models give coordinates as percentages, sometimes as pixels.
             val valuesAreNormalized =
                 max(
                     max(centerX, centerY),
@@ -151,6 +155,7 @@ internal class YoloOutputDecoder(
                     1f
                 }
 
+            // convert box to pixel coordinates on the model's input image.
             val modelCenterX =
                 centerX * inputSize
 
@@ -179,6 +184,7 @@ internal class YoloOutputDecoder(
                 modelCenterY +
                     modelHeight / 2f
 
+            // now translate those coordinates back to the original photo's size.
             val originalLeft =
                 (
                     modelLeft -
@@ -207,6 +213,7 @@ internal class YoloOutputDecoder(
                     ) /
                     preprocessing.scale
 
+            // make sure the box stays inside the photo.
             val clampedBox =
                 RectF(
                     originalLeft.coerceIn(
@@ -235,6 +242,7 @@ internal class YoloOutputDecoder(
                     )
                 )
 
+            // skip tiny boxes that are probably mistakes.
             if (
                 clampedBox.width() <
                     MINIMUM_BOX_SIZE ||
@@ -259,6 +267,7 @@ internal class YoloOutputDecoder(
                 )
         }
 
+        // clean up the list one last time to remove duplicates.
         return NonMaximumSuppression
             .apply(
                 detections =
@@ -268,6 +277,7 @@ internal class YoloOutputDecoder(
             )
     }
 
+    // helper to fix labels so they aren't just technical terms.
     private fun makeFriendlyLabel(
         rawLabel: String
     ): String {
@@ -302,11 +312,7 @@ internal class YoloOutputDecoder(
             }
     }
 
-    /*
-     * ByteBuffer does not expose the input image size directly, but for
-     * normalized-output fallback the square size can be derived from:
-     * bytes / float bytes / RGB channels.
-     */
+    // internal helper to figure out how big the model input was.
     private fun YoloImagePreprocessor.Result
         .bufferInputSize(): Int {
         val pixelCount =

@@ -3,6 +3,7 @@ package com.example.visualvocab.data.ai.remote.dto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+// this is for the request we send to groq. it's just a bunch of fields the API expects.
 @Serializable
 data class GroqRequestDto(
     val model: String,

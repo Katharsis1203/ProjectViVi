@@ -1,5 +1,6 @@
 package com.example.visualvocab.domain.model.training
 
+// this class represents a single photo that has been labeled for training.
 data class AnnotatedExample(
     val id: String,
     val imageFileName: String,

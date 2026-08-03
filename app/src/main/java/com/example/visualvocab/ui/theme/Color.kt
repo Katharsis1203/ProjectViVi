@@ -2,7 +2,7 @@ package com.example.visualvocab.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Camera Quest brand palette
+// this file has all the colors we use in the app to make it look pretty.
 val ExplorerBlue = Color(0xFF536DFE)
 val ExplorerBlueDark = Color(0xFF3446C8)
 val ExplorerBlueSoft = Color(0xFFE8ECFF)
@@ -28,7 +28,7 @@ val NightSurfaceRaised = Color(0xFF252B39)
 val NightText = Color(0xFFF6F7FB)
 val NightMuted = Color(0xFFB8C0D1)
 
-// Compatibility aliases retained for existing UI files.
+// compatibility aliases retained for existing UI files.
 val InkBlack = NightInk
 val Carbon = NightSurface
 val CarbonRaised = NightSurfaceRaised

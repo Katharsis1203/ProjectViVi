@@ -6,12 +6,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
+// this class holds info about the YOLO model, like what kind of objects it can find.
 @Serializable
 data class YoloModelMetadata(
     val names: Map<String, String>,
     val input_size: Int = 640,
     val base_model: String? = null
 ) {
+    // a simple list of all the labels the model knows, in the right order.
     val classNames: List<String>
         get() =
             names.entries
@@ -30,6 +32,7 @@ data class YoloModelMetadata(
                 ignoreUnknownKeys = true
             }
 
+        // load the metadata from either the assets or a file we downloaded.
         fun load(
             context: Context,
             source: YoloModelSource

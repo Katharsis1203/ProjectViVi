@@ -4,6 +4,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 
+// this class takes care of moving a newly downloaded model into the active folder.
 class ModelInstaller(
     private val fileStore:
         ModelFileStore
@@ -14,6 +15,7 @@ class ModelInstaller(
             encodeDefaults = true
         }
 
+    // move the pending model to be the active one.
     fun install(
         manifest: ModelManifest
     ) {
@@ -23,6 +25,7 @@ class ModelInstaller(
         val pendingMetadata =
             fileStore.pendingMetadataFile
 
+        // make sure both the model and its info file are actually there.
         require(
             pendingModel.isFile &&
                 pendingMetadata.isFile
@@ -30,6 +33,7 @@ class ModelInstaller(
             "The pending model package is incomplete."
         }
 
+        // remove the old backup and move the current model to the previous folder.
         fileStore.previousDirectory
             .deleteRecursively()
 
@@ -45,6 +49,7 @@ class ModelInstaller(
             )
         }
 
+        // create the folder for the new model and copy the files over.
         check(
             fileStore.activeDirectory
                 .mkdirs()
@@ -64,6 +69,7 @@ class ModelInstaller(
             overwrite = true
         )
 
+        // save the version and manifest so we know what we have installed.
         fileStore.activeVersionFile
             .writeText(
                 manifest.version
@@ -76,9 +82,11 @@ class ModelInstaller(
                 )
             )
 
+        // clean up the temporary download folder.
         fileStore.clearPending()
     }
 
+    // helper to move a whole folder by renaming it or copying if rename fails.
     private fun moveDirectory(
         source: File,
         destination: File
