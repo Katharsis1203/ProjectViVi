@@ -17,12 +17,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Collections
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +47,7 @@ import com.example.visualvocab.ui.theme.QuestGold
 @Composable
 fun ImagePickerContent(
     onSelectImage: () -> Unit,
+    onOpenCreatorStudio: (() -> Unit)? = null,
     targetWord: String? = null,
     isTeachMode: Boolean = false
 ) {
@@ -161,6 +164,29 @@ fun ImagePickerContent(
                 }
 
                 if (!isTeachMode) {
+                    onOpenCreatorStudio?.let { openCreatorStudio ->
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = openCreatorStudio,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
+                            shape = RoundedCornerShape(18.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Edit,
+                                contentDescription = null,
+                                tint = Color(0xFFD7C8FF)
+                            )
+                            Spacer(Modifier.size(9.dp))
+                            Text(
+                                text = "Open Creator Studio",
+                                fontWeight = FontWeight.Bold,
+                                color = NightText
+                            )
+                        }
+                    }
+
                     Spacer(Modifier.height(18.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,

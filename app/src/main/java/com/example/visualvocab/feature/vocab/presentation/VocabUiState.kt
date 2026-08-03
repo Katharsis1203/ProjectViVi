@@ -2,11 +2,12 @@ package com.example.visualvocab.feature.vocab.presentation
 
 import android.graphics.Bitmap
 import android.net.Uri
+import com.example.visualvocab.data.progress.PlayerProgress
+import com.example.visualvocab.data.progress.WordProgress
 import com.example.visualvocab.domain.model.AppMode
 import com.example.visualvocab.domain.model.DetectionResult
 import com.example.visualvocab.domain.model.SentenceDifficulty
 import com.example.visualvocab.domain.model.Vocabulary
-import com.example.visualvocab.data.progress.PlayerProgress
 
 enum class AnnotationTool {
     SELECT, DRAW
@@ -17,12 +18,24 @@ enum class LessonAnswerResult {
     INCORRECT
 }
 
+enum class LearningSessionMode {
+    SCAN,
+    REVIEW
+}
+
+enum class LessonQuestionType {
+    ENGLISH_TO_SPANISH,
+    SPANISH_TO_ENGLISH,
+    TAP_OBJECT
+}
+
 data class VocabUiState(
     val selectedImageUri: Uri? = null,
     val bitmap: Bitmap? = null,
     val detections: List<DetectionResult> = emptyList(),
     val generalLabels: List<String> = emptyList(),
     val selectedDetection: DetectionResult? = null,
+    val lessonTargetDetection: DetectionResult? = null,
     val overlappingDetections: List<DetectionResult> = emptyList(),
     val vocabulary: Vocabulary? = null,
     val sentenceDifficulty: SentenceDifficulty = SentenceDifficulty.MEDIUM,
@@ -32,7 +45,11 @@ data class VocabUiState(
 
     val appMode: AppMode = AppMode.LEARN,
 
-    // Learn Mode / Lesson State
+    // Learn / Review session state
+    val learningSessionMode: LearningSessionMode = LearningSessionMode.SCAN,
+    val lessonQuestionType: LessonQuestionType = LessonQuestionType.ENGLISH_TO_SPANISH,
+    val lessonPrompt: String = "",
+    val lessonCorrectAnswer: String = "",
     val lessonTargetCount: Int = 0,
     val lessonAnsweredCount: Int = 0,
     val lessonCorrectCount: Int = 0,
@@ -43,6 +60,8 @@ data class VocabUiState(
     val isLessonComplete: Boolean = false,
     val lessonXpEarned: Int = 0,
     val lessonNewWords: Int = 0,
+    val reviewQueue: List<WordProgress> = emptyList(),
+    val reviewCurrentIndex: Int = 0,
 
     // Persistent player progression
     val playerProgress: PlayerProgress = PlayerProgress(),
@@ -60,7 +79,7 @@ data class VocabUiState(
     val isExportingTrainingDataset: Boolean = false,
     val trainingMessage: String? = null,
 
-    // Optional Upload (stable)
+    // Optional Upload
     val isUploadingTrainingDataset: Boolean = false,
     val datasetUploadMessage: String? = null
 ) {
@@ -74,6 +93,9 @@ data class VocabUiState(
     val hasSelectedObject: Boolean
         get() = selectedDetection != null
 
+    val hasActiveQuestion: Boolean
+        get() = vocabulary != null || isGenerating || lessonTargetDetection != null
+
     val currentLessonQuestionNumber: Int
         get() = if (lessonTargetCount <= 0) {
             0
@@ -83,6 +105,9 @@ data class VocabUiState(
 
     val remainingLessonQuestionCount: Int
         get() = (lessonTargetCount - lessonAnsweredCount).coerceAtLeast(0)
+
+    val currentReviewWord: WordProgress?
+        get() = reviewQueue.getOrNull(reviewCurrentIndex)
 
     val selectedTrainingAnnotation: EditableTrainingAnnotation?
         get() = editableTrainingAnnotations.firstOrNull { it.id == selectedTrainingAnnotationId }

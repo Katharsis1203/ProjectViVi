@@ -16,7 +16,23 @@ sealed interface VocabUiEvent {
     data object ClearSelectedObject : VocabUiEvent
     data class LessonAnswerSelected(val answer: String) : VocabUiEvent
     data object ContinueLesson : VocabUiEvent
+    data object RetryLessonQuestion : VocabUiEvent
     data object RestartLesson : VocabUiEvent
+
+    data object StartReview : VocabUiEvent
+    data class StartWordReview(val wordKey: String) : VocabUiEvent
+    data object ContinueReview : VocabUiEvent
+    data object RestartReview : VocabUiEvent
+    data object EndReview : VocabUiEvent
+
+    data class UpdateSavedWord(
+        val wordKey: String,
+        val english: String,
+        val spanish: String
+    ) : VocabUiEvent
+
+    data class DeleteSavedWord(val wordKey: String) : VocabUiEvent
+    data object CompleteOnboarding : VocabUiEvent
 
     data class ChangeMode(val mode: AppMode) : VocabUiEvent
 

@@ -27,11 +27,13 @@ import kotlin.math.abs
 fun DetectionOverlay(
     detections: List<DetectionResult>,
     selectedDetection: DetectionResult?,
+    correctDetection: DetectionResult? = null,
     completedDetections: List<DetectionResult> = emptyList(),
     answerResult: LessonAnswerResult? = null,
     imageWidth: Int,
     imageHeight: Int,
-    useCropScale: Boolean = false
+    useCropScale: Boolean = false,
+    showLabels: Boolean = true
 ) {
     val textMeasurer = rememberTextMeasurer()
     val normalColor = MaterialTheme.colorScheme.primary
@@ -63,25 +65,27 @@ fun DetectionOverlay(
             val bottom = box.bottom * scale + offsetY
 
             val isSelected = detectionsMatch(detection, selectedDetection)
+            val isCorrectTarget = answerResult != null && detectionsMatch(detection, correctDetection)
             val isCompleted = completedDetections.any { detectionsMatch(detection, it) }
 
             val outlineColor = when {
                 isSelected && answerResult == LessonAnswerResult.CORRECT -> SuccessGreen
                 isSelected && answerResult == LessonAnswerResult.INCORRECT -> FriendlyCoral
+                isCorrectTarget -> SuccessGreen
                 isSelected -> QuestGold
                 isCompleted -> DiscoveryMint
                 else -> normalColor.copy(alpha = 0.74f)
             }
 
             val strokeWidth = when {
-                isSelected -> 3.5.dp.toPx()
+                isSelected || isCorrectTarget -> 3.5.dp.toPx()
                 isCompleted -> 2.3.dp.toPx()
                 else -> 1.6.dp.toPx()
             }
 
-            if (isSelected || isCompleted) {
+            if (isSelected || isCorrectTarget || isCompleted) {
                 drawRoundRect(
-                    color = outlineColor.copy(alpha = if (isSelected) 0.18f else 0.10f),
+                    color = outlineColor.copy(alpha = if (isSelected || isCorrectTarget) 0.18f else 0.10f),
                     topLeft = Offset(left, top),
                     size = Size(
                         width = (right - left).coerceAtLeast(0f),
@@ -102,6 +106,8 @@ fun DetectionOverlay(
                 style = Stroke(width = strokeWidth)
             )
 
+            if (!showLabels) return@forEach
+
             val objectName = detection.label
                 .trim()
                 .replaceFirstChar { character ->
@@ -111,6 +117,7 @@ fun DetectionOverlay(
             val label = when {
                 isSelected && answerResult == LessonAnswerResult.CORRECT -> "$objectName  ✓"
                 isSelected && answerResult == LessonAnswerResult.INCORRECT -> "$objectName  !"
+                isCorrectTarget -> "$objectName  ✓"
                 isSelected -> "$objectName  ?"
                 isCompleted -> "$objectName  ✓"
                 else -> objectName
@@ -133,7 +140,7 @@ fun DetectionOverlay(
             )
 
             drawRoundRect(
-                color = outlineColor.copy(alpha = if (isSelected || isCompleted) 0.94f else 0.82f),
+                color = outlineColor.copy(alpha = if (isSelected || isCorrectTarget || isCompleted) 0.94f else 0.82f),
                 topLeft = Offset(labelLeft, labelTop),
                 size = Size(labelWidth, labelHeight),
                 cornerRadius = CornerRadius(50.dp.toPx(), 50.dp.toPx())

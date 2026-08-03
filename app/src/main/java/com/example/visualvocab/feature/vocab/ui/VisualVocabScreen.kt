@@ -37,7 +37,9 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material3.AlertDialog
@@ -78,7 +80,9 @@ import com.example.visualvocab.domain.model.AppMode
 import com.example.visualvocab.domain.model.DetectionResult
 import com.example.visualvocab.feature.vocab.presentation.AnnotationTool
 import com.example.visualvocab.feature.vocab.presentation.EditableTrainingAnnotation
+import com.example.visualvocab.feature.vocab.presentation.LearningSessionMode
 import com.example.visualvocab.feature.vocab.presentation.LessonAnswerResult
+import com.example.visualvocab.feature.vocab.presentation.LessonQuestionType
 import com.example.visualvocab.feature.vocab.presentation.VocabUiEvent
 import com.example.visualvocab.feature.vocab.presentation.VocabUiState
 import com.example.visualvocab.feature.vocab.presentation.VocabViewModel
@@ -86,6 +90,8 @@ import com.example.visualvocab.feature.vocab.ui.components.AnnotationOverlay
 import com.example.visualvocab.feature.vocab.ui.components.DetectionOverlay
 import com.example.visualvocab.feature.vocab.ui.components.ImagePickerContent
 import com.example.visualvocab.feature.vocab.ui.components.LessonCompleteCard
+import com.example.visualvocab.feature.vocab.ui.components.VocabSpeaker
+import com.example.visualvocab.feature.vocab.ui.components.rememberVocabSpeaker
 import com.example.visualvocab.feature.vocab.ui.components.VocabularyCard
 import com.example.visualvocab.ui.theme.CreatorPurple
 import com.example.visualvocab.ui.theme.NightInk
@@ -95,11 +101,30 @@ import com.example.visualvocab.ui.theme.SuccessGreen
 fun VisualVocabScreen(viewModel: VocabViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     var destination by rememberSaveable { mutableStateOf(VisualVocabDestination.HOME) }
+    var selectedWordKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var reviewReturnDestination by rememberSaveable { mutableStateOf(VisualVocabDestination.HOME) }
+    var creatorWorkspaceOpen by rememberSaveable { mutableStateOf(false) }
+    val speaker = rememberVocabSpeaker()
+
+    LaunchedEffect(destination, selectedWordKey, uiState.playerProgress.words) {
+        if (
+            destination == VisualVocabDestination.WORD_DETAIL &&
+            uiState.playerProgress.words.none { it.key == selectedWordKey }
+        ) {
+            selectedWordKey = null
+            destination = VisualVocabDestination.WORDS
+        }
+    }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
-        uri?.let { viewModel.onEvent(VocabUiEvent.ImageSelected(it)) }
+        uri?.let {
+            if (viewModel.uiState.value.appMode == AppMode.TEACH) {
+                creatorWorkspaceOpen = true
+            }
+            viewModel.onEvent(VocabUiEvent.ImageSelected(it))
+        }
     }
 
     val exportLauncher = rememberLauncherForActivityResult(
@@ -116,6 +141,22 @@ fun VisualVocabScreen(viewModel: VocabViewModel) {
 
     val isCreatorStudio = uiState.appMode == AppMode.TEACH
 
+    LaunchedEffect(
+        isCreatorStudio,
+        creatorWorkspaceOpen,
+        uiState.bitmap,
+        uiState.trainingMessage
+    ) {
+        if (
+            isCreatorStudio &&
+            creatorWorkspaceOpen &&
+            uiState.bitmap == null &&
+            uiState.trainingMessage == "Training example saved."
+        ) {
+            creatorWorkspaceOpen = false
+        }
+    }
+
     fun openLearningScan() {
         if (uiState.appMode != AppMode.LEARN) {
             viewModel.onEvent(VocabUiEvent.ChangeMode(AppMode.LEARN))
@@ -123,20 +164,60 @@ fun VisualVocabScreen(viewModel: VocabViewModel) {
         destination = VisualVocabDestination.SCAN
     }
 
+    fun openReview(returnTo: VisualVocabDestination = destination) {
+        reviewReturnDestination = if (returnTo == VisualVocabDestination.WORD_DETAIL) {
+            VisualVocabDestination.WORDS
+        } else {
+            returnTo
+        }
+        viewModel.onEvent(VocabUiEvent.StartReview)
+        destination = VisualVocabDestination.REVIEW
+    }
+
+    fun closeReview() {
+        viewModel.onEvent(VocabUiEvent.EndReview)
+        destination = reviewReturnDestination
+    }
+
     fun exitCreatorStudio() {
+        creatorWorkspaceOpen = false
         viewModel.onEvent(VocabUiEvent.ChangeMode(AppMode.LEARN))
         destination = VisualVocabDestination.PROFILE
     }
 
+    fun openCreatorStudio(useCurrentImage: Boolean = false) {
+        viewModel.onEvent(VocabUiEvent.ClearSelectedObject)
+        viewModel.onEvent(VocabUiEvent.ChangeMode(AppMode.TEACH))
+        creatorWorkspaceOpen = useCurrentImage && uiState.bitmap != null
+        destination = VisualVocabDestination.SCAN
+    }
+
+    fun creatorBack() {
+        if (creatorWorkspaceOpen) {
+            creatorWorkspaceOpen = false
+            viewModel.onEvent(VocabUiEvent.DismissTrainingAnnotation)
+        } else {
+            exitCreatorStudio()
+        }
+    }
+
     BackHandler(enabled = isCreatorStudio) {
-        exitCreatorStudio()
+        creatorBack()
     }
 
     BackHandler(enabled = !isCreatorStudio && destination != VisualVocabDestination.HOME) {
-        if (destination == VisualVocabDestination.SCAN) {
-            viewModel.onEvent(VocabUiEvent.ClearSelectedObject)
+        when (destination) {
+            VisualVocabDestination.REVIEW -> closeReview()
+            VisualVocabDestination.WORD_DETAIL -> {
+                selectedWordKey = null
+                destination = VisualVocabDestination.WORDS
+            }
+            VisualVocabDestination.SCAN -> {
+                viewModel.onEvent(VocabUiEvent.ClearSelectedObject)
+                destination = VisualVocabDestination.HOME
+            }
+            else -> destination = VisualVocabDestination.HOME
         }
-        destination = VisualVocabDestination.HOME
     }
 
     Scaffold(
@@ -145,16 +226,18 @@ fun VisualVocabScreen(viewModel: VocabViewModel) {
             GameTopBar(
                 destination = destination,
                 isCreatorStudio = isCreatorStudio,
+                creatorWorkspaceOpen = creatorWorkspaceOpen,
                 imageSelected = uiState.bitmap != null,
                 imageActionsEnabled = !uiState.isProcessing,
                 playerProgress = uiState.playerProgress,
                 onChangeImage = chooseImage,
-                onExitCreatorStudio = ::exitCreatorStudio
+                onCreatorBack = ::creatorBack
             )
         },
         bottomBar = {
             when {
                 isCreatorStudio &&
+                        creatorWorkspaceOpen &&
                         destination == VisualVocabDestination.SCAN &&
                         uiState.bitmap != null -> {
                     TeachControls(
@@ -171,7 +254,9 @@ fun VisualVocabScreen(viewModel: VocabViewModel) {
                     )
                 }
 
-                !isCreatorStudio -> {
+                !isCreatorStudio &&
+                        destination != VisualVocabDestination.REVIEW &&
+                        destination != VisualVocabDestination.WORD_DETAIL -> {
                     GameBottomNavigation(
                         selected = destination,
                         onSelected = { selected ->
@@ -198,44 +283,115 @@ fun VisualVocabScreen(viewModel: VocabViewModel) {
         ) {
             when {
                 isCreatorStudio -> {
-                    ScanWorkspace(
-                        uiState = uiState,
-                        onEvent = { event -> viewModel.onEvent(event) },
-                        onChooseImage = chooseImage
-                    )
+                    if (creatorWorkspaceOpen) {
+                        ScanWorkspace(
+                            uiState = uiState,
+                            speaker = speaker,
+                            onEvent = { event -> viewModel.onEvent(event) },
+                            onChooseImage = chooseImage,
+                            onOpenCreatorStudio = { _ -> creatorWorkspaceOpen = true }
+                        )
+                    } else {
+                        CreatorStudioLanding(
+                            exampleCount = uiState.trainingExampleCount,
+                            isUploading = uiState.isUploadingTrainingDataset,
+                            isExporting = uiState.isExportingTrainingDataset,
+                            onAnnotatePhoto = chooseImage,
+                            onUploadDataset = {
+                                viewModel.onEvent(VocabUiEvent.UploadTrainingDataset)
+                            },
+                            onExportDataset = {
+                                exportLauncher.launch("visual_vocab_dataset.zip")
+                            }
+                        )
+                    }
                 }
 
                 destination == VisualVocabDestination.HOME -> {
-                    HomeScreen(
+                    Pass4HomeScreen(
                         playerProgress = uiState.playerProgress,
                         onStartScan = ::openLearningScan,
-                        onOpenWords = { destination = VisualVocabDestination.WORDS }
+                        onStartReview = { openReview(VisualVocabDestination.HOME) },
+                        onOpenWords = { destination = VisualVocabDestination.WORDS },
+                        onOpenCreatorStudio = { openCreatorStudio(false) }
                     )
                 }
 
                 destination == VisualVocabDestination.SCAN -> {
                     ScanWorkspace(
                         uiState = uiState,
+                        speaker = speaker,
                         onEvent = { event -> viewModel.onEvent(event) },
-                        onChooseImage = chooseImage
+                        onChooseImage = chooseImage,
+                        onOpenCreatorStudio = { useCurrentImage ->
+                            openCreatorStudio(useCurrentImage)
+                        }
                     )
                 }
 
                 destination == VisualVocabDestination.WORDS -> {
-                    WordsScreen(
+                    EnhancedWordsScreen(
                         playerProgress = uiState.playerProgress,
-                        onStartScan = ::openLearningScan
+                        speaker = speaker,
+                        onStartScan = ::openLearningScan,
+                        onStartReview = { openReview(VisualVocabDestination.WORDS) },
+                        onWordSelected = { key ->
+                            selectedWordKey = key
+                            destination = VisualVocabDestination.WORD_DETAIL
+                        }
                     )
+                }
+
+                destination == VisualVocabDestination.REVIEW -> {
+                    ReviewScreen(
+                        uiState = uiState,
+                        speaker = speaker,
+                        onAnswerSelected = { answer ->
+                            viewModel.onEvent(VocabUiEvent.LessonAnswerSelected(answer))
+                        },
+                        onContinue = { viewModel.onEvent(VocabUiEvent.ContinueReview) },
+                        onRestart = { viewModel.onEvent(VocabUiEvent.RestartReview) },
+                        onDone = ::closeReview,
+                        onBack = ::closeReview
+                    )
+                }
+
+                destination == VisualVocabDestination.WORD_DETAIL -> {
+                    uiState.playerProgress.words
+                        .firstOrNull { it.key == selectedWordKey }
+                        ?.let { word ->
+                            WordDetailScreen(
+                                word = word,
+                                speaker = speaker,
+                                onBack = {
+                                    selectedWordKey = null
+                                    destination = VisualVocabDestination.WORDS
+                                },
+                                onPractice = {
+                                    reviewReturnDestination = VisualVocabDestination.WORDS
+                                    viewModel.onEvent(VocabUiEvent.StartWordReview(word.key))
+                                    destination = VisualVocabDestination.REVIEW
+                                },
+                                onSave = { english, spanish ->
+                                    viewModel.onEvent(
+                                        VocabUiEvent.UpdateSavedWord(word.key, english, spanish)
+                                    )
+                                    selectedWordKey = null
+                                    destination = VisualVocabDestination.WORDS
+                                },
+                                onDelete = {
+                                    viewModel.onEvent(VocabUiEvent.DeleteSavedWord(word.key))
+                                    selectedWordKey = null
+                                    destination = VisualVocabDestination.WORDS
+                                }
+                            )
+                        }
                 }
 
                 destination == VisualVocabDestination.PROFILE -> {
                     ProfileScreen(
                         playerProgress = uiState.playerProgress,
-                        onOpenCreatorStudio = {
-                            viewModel.onEvent(VocabUiEvent.ClearSelectedObject)
-                            viewModel.onEvent(VocabUiEvent.ChangeMode(AppMode.TEACH))
-                            destination = VisualVocabDestination.SCAN
-                        }
+                        onOpenCreatorStudio = { openCreatorStudio(false) }
                     )
                 }
             }
@@ -243,7 +399,9 @@ fun VisualVocabScreen(viewModel: VocabViewModel) {
             val visibleMessage: Pair<String, Boolean>? = when {
                 !uiState.datasetUploadMessage.isNullOrBlank() -> uiState.datasetUploadMessage!! to false
                 !uiState.trainingMessage.isNullOrBlank() -> uiState.trainingMessage!! to false
-                !uiState.errorMessage.isNullOrBlank() && !uiState.hasSelectedObject -> {
+                !uiState.errorMessage.isNullOrBlank() &&
+                        !uiState.hasActiveQuestion &&
+                        !(uiState.bitmap != null && uiState.detections.isEmpty() && !uiState.isDetecting) -> {
                     uiState.errorMessage!! to true
                 }
                 else -> null
@@ -300,6 +458,12 @@ fun VisualVocabScreen(viewModel: VocabViewModel) {
                         viewModel.onEvent(VocabUiEvent.DeleteTrainingAnnotation(annotation.id))
                     }
                 }
+            )
+        }
+
+        if (!uiState.playerProgress.onboardingCompleted) {
+            OnboardingOverlay(
+                onComplete = { viewModel.onEvent(VocabUiEvent.CompleteOnboarding) }
             )
         }
     }
@@ -367,14 +531,21 @@ private fun XpAwardBurst(
 @Composable
 private fun ScanWorkspace(
     uiState: VocabUiState,
+    speaker: VocabSpeaker,
     onEvent: (VocabUiEvent) -> Unit,
-    onChooseImage: () -> Unit
+    onChooseImage: () -> Unit,
+    onOpenCreatorStudio: (useCurrentImage: Boolean) -> Unit
 ) {
     val bitmap = uiState.bitmap
 
     if (bitmap == null) {
         ImagePickerContent(
             onSelectImage = onChooseImage,
+            onOpenCreatorStudio = if (uiState.appMode == AppMode.LEARN) {
+                { onOpenCreatorStudio(false) }
+            } else {
+                null
+            },
             targetWord = uiState.targetWord,
             isTeachMode = uiState.appMode == AppMode.TEACH
         )
@@ -383,6 +554,20 @@ private fun ScanWorkspace(
 
     Column(modifier = Modifier.fillMaxSize()) {
         WorkspaceStatus(uiState = uiState)
+
+        if (
+            uiState.appMode == AppMode.LEARN &&
+            !uiState.isDetecting &&
+            uiState.detections.isNotEmpty() &&
+            uiState.detections.maxOfOrNull { it.score }?.let { it < LOW_CONFIDENCE_THRESHOLD } == true &&
+            !uiState.hasActiveQuestion &&
+            !uiState.isLessonComplete
+        ) {
+            CreatorSuggestionStrip(
+                message = "These detections look uncertain. You can correct them in Creator Studio.",
+                onOpenCreatorStudio = { onOpenCreatorStudio(true) }
+            )
+        }
 
         Box(
             modifier = Modifier
@@ -393,15 +578,24 @@ private fun ScanWorkspace(
                     uiState.detections,
                     uiState.completedLessonDetections,
                     uiState.selectedDetection,
+                    uiState.lessonTargetDetection,
+                    uiState.lessonQuestionType,
+                    uiState.lessonAnswerResult,
                     uiState.isLessonComplete,
                     uiState.appMode,
                     bitmap
                 ) {
                     detectTapGestures { tapOffset ->
+                        val acceptingTapObjectAnswer =
+                            uiState.lessonQuestionType == LessonQuestionType.TAP_OBJECT &&
+                                    uiState.lessonTargetDetection != null &&
+                                    uiState.vocabulary != null &&
+                                    uiState.lessonAnswerResult == null
+
                         if (
                             uiState.appMode != AppMode.LEARN ||
-                            uiState.selectedDetection != null ||
-                            uiState.isLessonComplete
+                            uiState.isLessonComplete ||
+                            (uiState.hasActiveQuestion && !acceptingTapObjectAnswer)
                         ) {
                             return@detectTapGestures
                         }
@@ -418,9 +612,10 @@ private fun ScanWorkspace(
                         val matches = uiState.detections
                             .filter { detection ->
                                 detection.boundingBox.contains(bitmapX, bitmapY) &&
-                                        uiState.completedLessonDetections.none { completed ->
-                                            detectionsMatch(detection, completed)
-                                        }
+                                        (acceptingTapObjectAnswer ||
+                                                uiState.completedLessonDetections.none { completed ->
+                                                    detectionsMatch(detection, completed)
+                                                })
                             }
                             .sortedByDescending { it.score }
 
@@ -499,25 +694,59 @@ private fun ScanWorkspace(
                 DetectionOverlay(
                     detections = uiState.detections,
                     selectedDetection = uiState.selectedDetection,
+                    correctDetection = if (
+                        uiState.lessonQuestionType == LessonQuestionType.TAP_OBJECT &&
+                        uiState.lessonAnswerResult != null
+                    ) uiState.lessonTargetDetection else null,
                     completedDetections = uiState.completedLessonDetections,
                     answerResult = uiState.lessonAnswerResult,
                     imageWidth = bitmap.width,
                     imageHeight = bitmap.height,
-                    useCropScale = true
+                    useCropScale = true,
+                    showLabels = !(
+                            uiState.lessonQuestionType == LessonQuestionType.TAP_OBJECT &&
+                                    uiState.hasActiveQuestion &&
+                                    uiState.lessonAnswerResult == null
+                            )
                 )
             }
 
             androidx.compose.animation.AnimatedVisibility(
-                visible = uiState.hasSelectedObject && uiState.appMode == AppMode.LEARN,
+                visible = uiState.appMode == AppMode.LEARN &&
+                        !uiState.isDetecting &&
+                        uiState.detections.isEmpty() &&
+                        !uiState.isLessonComplete,
+                enter = fadeIn() + scaleIn(initialScale = 0.96f),
+                exit = fadeOut() + scaleOut(targetScale = 0.96f),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 20.dp)
+                    .zIndex(4f)
+            ) {
+                NoDetectionsCard(
+                    onChooseAnotherPhoto = onChooseImage,
+                    onTeachVivi = { onOpenCreatorStudio(true) }
+                )
+            }
+
+            androidx.compose.animation.AnimatedVisibility(
+                visible = uiState.hasActiveQuestion && !uiState.isLessonComplete && uiState.appMode == AppMode.LEARN,
                 enter = fadeIn() + scaleIn(initialScale = 0.95f) + slideInVertically { it / 10 },
                 exit = fadeOut() + scaleOut(targetScale = 0.96f) + slideOutVertically { it / 12 },
                 modifier = Modifier
-                    .align(Alignment.Center)
+                    .align(
+                        if (uiState.lessonQuestionType == LessonQuestionType.TAP_OBJECT &&
+                            uiState.lessonAnswerResult == null
+                        ) Alignment.TopCenter else Alignment.Center
+                    )
                     .padding(horizontal = 18.dp, vertical = 12.dp)
                     .zIndex(5f)
             ) {
                 VocabularyCard(
                     vocabulary = uiState.vocabulary,
+                    questionType = uiState.lessonQuestionType,
+                    prompt = uiState.lessonPrompt,
+                    correctAnswer = uiState.lessonCorrectAnswer,
                     options = uiState.lessonOptions,
                     selectedAnswer = uiState.selectedLessonAnswer,
                     answerResult = uiState.lessonAnswerResult,
@@ -525,23 +754,24 @@ private fun ScanWorkspace(
                     questionTotal = uiState.lessonTargetCount,
                     isGenerating = uiState.isGenerating,
                     generationError = uiState.errorMessage,
+                    showCloseButton = !(
+                            uiState.lessonQuestionType == LessonQuestionType.TAP_OBJECT &&
+                                    uiState.lessonAnswerResult == null
+                            ),
                     onAnswerSelected = { answer ->
                         onEvent(VocabUiEvent.LessonAnswerSelected(answer))
                     },
                     onContinue = { onEvent(VocabUiEvent.ContinueLesson) },
-                    onRetry = {
-                        uiState.selectedDetection?.let { detection ->
-                            onEvent(VocabUiEvent.ClearSelectedObject)
-                            onEvent(VocabUiEvent.ObjectTapped(detection))
-                        }
-                    },
+                    onRetry = { onEvent(VocabUiEvent.RetryLessonQuestion) },
                     onClose = {
                         if (uiState.lessonAnswerResult != null) {
                             onEvent(VocabUiEvent.ContinueLesson)
                         } else {
                             onEvent(VocabUiEvent.ClearSelectedObject)
                         }
-                    }
+                    },
+                    onSpeakEnglish = speaker::speakEnglish,
+                    onSpeakSpanish = speaker::speakSpanish
                 )
             }
 
@@ -595,10 +825,11 @@ private fun WorkspaceStatus(uiState: VocabUiState) {
         uiState.detections.isEmpty() -> "No clear objects found — try a brighter photo"
         uiState.isLessonComplete -> "Quest complete — ${uiState.lessonCorrectCount} of ${uiState.lessonTargetCount} correct"
         uiState.isGenerating -> "Vivi is building question ${uiState.currentLessonQuestionNumber}…"
-        uiState.hasSelectedObject && !uiState.errorMessage.isNullOrBlank() -> "That question did not load — try again or choose another object"
+        uiState.hasActiveQuestion && !uiState.errorMessage.isNullOrBlank() -> "That question did not load — try again or choose another object"
         uiState.lessonAnswerResult == LessonAnswerResult.CORRECT -> "Correct! Read the example, then continue"
         uiState.lessonAnswerResult == LessonAnswerResult.INCORRECT -> "Good try — the correct answer is highlighted"
-        uiState.hasSelectedObject -> "Choose the Spanish translation"
+        uiState.lessonQuestionType == LessonQuestionType.TAP_OBJECT && uiState.hasActiveQuestion -> uiState.lessonPrompt
+        uiState.hasActiveQuestion -> uiState.lessonPrompt.ifBlank { "Choose the best answer" }
         else -> {
             val nextQuestion = uiState.currentLessonQuestionNumber.coerceAtLeast(1)
             "Question $nextQuestion of ${uiState.lessonTargetCount} — tap a blue object"
@@ -651,6 +882,99 @@ private fun WorkspaceStatus(uiState: VocabUiState) {
                 textAlign = TextAlign.Center,
                 maxLines = 2
             )
+        }
+    }
+}
+
+@Composable
+private fun CreatorSuggestionStrip(
+    message: String,
+    onOpenCreatorStudio: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        tonalElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Edit,
+                contentDescription = null,
+                tint = CreatorPurple,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                text = message,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+            TextButton(onClick = onOpenCreatorStudio) {
+                Text("Teach Vivi", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun NoDetectionsCard(
+    onChooseAnotherPhoto: () -> Unit,
+    onTeachVivi: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
+        shadowElevation = 12.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            com.example.visualvocab.feature.vocab.ui.components.ViviMascot(
+                pose = com.example.visualvocab.feature.vocab.ui.components.ViviPose.ENCOURAGING,
+                modifier = Modifier.size(92.dp)
+            )
+            Text(
+                text = "Vivi couldn't find a clear object",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "Try a brighter photo, or use this image to teach Vivi the object yourself.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Button(
+                onClick = onChooseAnotherPhoto,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(17.dp)
+            ) {
+                Icon(Icons.Rounded.Refresh, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text("Try another photo", fontWeight = FontWeight.Bold)
+            }
+            OutlinedButton(
+                onClick = onTeachVivi,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(17.dp)
+            ) {
+                Icon(Icons.Rounded.Edit, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text("Teach Vivi with this photo", fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -991,3 +1315,5 @@ private fun detectionsMatch(
             kotlin.math.abs(first.boundingBox.top - second.boundingBox.top) <= tolerance &&
             kotlin.math.abs(first.boundingBox.right - second.boundingBox.right) <= tolerance &&
             kotlin.math.abs(first.boundingBox.bottom - second.boundingBox.bottom) <= tolerance
+
+private const val LOW_CONFIDENCE_THRESHOLD = 0.55f

@@ -1,7 +1,8 @@
 package com.example.visualvocab.feature.vocab.ui.components
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,50 +13,43 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Bolt
-import androidx.compose.material.icons.rounded.CollectionsBookmark
-import androidx.compose.material.icons.rounded.LocalFireDepartment
-import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Cancel
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.EmojiEvents
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Star
-import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.TouchApp
+import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.visualvocab.domain.model.Vocabulary
 import com.example.visualvocab.feature.vocab.presentation.LessonAnswerResult
+import com.example.visualvocab.feature.vocab.presentation.LessonQuestionType
 import com.example.visualvocab.ui.theme.DiscoveryMintSoft
-import com.example.visualvocab.ui.theme.ExplorerBlueSoft
+import com.example.visualvocab.ui.theme.ExplorerBlueDark
 import com.example.visualvocab.ui.theme.FriendlyCoral
 import com.example.visualvocab.ui.theme.FriendlyCoralSoft
 import com.example.visualvocab.ui.theme.QuestGold
@@ -65,6 +59,9 @@ import com.example.visualvocab.ui.theme.SuccessGreen
 @Composable
 fun VocabularyCard(
     vocabulary: Vocabulary?,
+    questionType: LessonQuestionType,
+    prompt: String,
+    correctAnswer: String,
     options: List<String>,
     selectedAnswer: String?,
     answerResult: LessonAnswerResult?,
@@ -72,380 +69,345 @@ fun VocabularyCard(
     questionTotal: Int,
     isGenerating: Boolean,
     generationError: String?,
+    showCloseButton: Boolean = true,
     onAnswerSelected: (String) -> Unit,
     onContinue: () -> Unit,
     onRetry: () -> Unit,
     onClose: () -> Unit,
-    modifier: Modifier = Modifier
+    onSpeakEnglish: (String) -> Unit,
+    onSpeakSpanish: (String) -> Unit
 ) {
-    ElevatedCard(
-        modifier = modifier
-            .widthIn(max = 390.dp)
-            .fillMaxWidth(),
-        shape = RoundedCornerShape(30.dp)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 12.dp
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            IconButton(
-                onClick = onClose,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 10.dp, end = 10.dp)
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Close,
-                    contentDescription = "Close question",
-                    modifier = Modifier.size(19.dp)
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            LessonHeader(
+                questionNumber = questionNumber,
+                questionTotal = questionTotal,
+                showCloseButton = showCloseButton,
+                onClose = onClose
+            )
+
+            when {
+                isGenerating -> LoadingContent()
+                !generationError.isNullOrBlank() && vocabulary == null -> ErrorContent(
+                    message = generationError,
+                    onRetry = onRetry
                 )
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp, vertical = 22.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                LessonProgressHeader(
-                    questionNumber = questionNumber,
-                    questionTotal = questionTotal
+                vocabulary != null -> QuestionContent(
+                    vocabulary = vocabulary,
+                    questionType = questionType,
+                    prompt = prompt,
+                    correctAnswer = correctAnswer,
+                    options = options,
+                    selectedAnswer = selectedAnswer,
+                    answerResult = answerResult,
+                    onAnswerSelected = onAnswerSelected,
+                    onContinue = onContinue,
+                    onSpeakEnglish = onSpeakEnglish,
+                    onSpeakSpanish = onSpeakSpanish
                 )
-
-                Spacer(Modifier.height(18.dp))
-
-                when {
-                    isGenerating -> LoadingQuestionContent()
-                    vocabulary == null -> QuestionErrorContent(
-                        message = generationError,
-                        onRetry = onRetry
-                    )
-                    else -> QuestionContent(
-                        vocabulary = vocabulary,
-                        options = options,
-                        selectedAnswer = selectedAnswer,
-                        answerResult = answerResult,
-                        onAnswerSelected = onAnswerSelected,
-                        onContinue = onContinue
-                    )
-                }
             }
         }
     }
 }
 
 @Composable
-private fun LessonProgressHeader(
+private fun LessonHeader(
     questionNumber: Int,
-    questionTotal: Int
+    questionTotal: Int,
+    showCloseButton: Boolean,
+    onClose: () -> Unit
 ) {
-    val safeTotal = questionTotal.coerceAtLeast(1)
-    val progress = questionNumber.coerceIn(0, safeTotal).toFloat() / safeTotal.toFloat()
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Question ${questionNumber.coerceAtLeast(1)} of ${questionTotal.coerceAtLeast(1)}",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.height(6.dp))
+            LinearProgressIndicator(
+                progress = {
+                    if (questionTotal <= 0) 0f else {
+                        questionNumber.toFloat().div(questionTotal).coerceIn(0f, 1f)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(7.dp),
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        }
+        if (showCloseButton) {
+            IconButton(onClick = onClose) {
+                Icon(Icons.Rounded.Close, contentDescription = "Close question")
+            }
+        }
+    }
+}
 
+@Composable
+private fun LoadingContent() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(end = 40.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(13.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "OBJECT QUEST",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = "$questionNumber of $questionTotal",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(progress)
-                    .height(8.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
-            )
-        }
+        ViviMascot(pose = ViviPose.SCANNING, modifier = Modifier.size(88.dp))
+        CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+        Text(
+            text = "Vivi is building your challenge…",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
 @Composable
-private fun LoadingQuestionContent() {
-    ViviMascot(
-        pose = ViviPose.SCANNING,
-        modifier = Modifier.size(96.dp)
-    )
-    Spacer(Modifier.height(12.dp))
-    CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
-    Spacer(Modifier.height(12.dp))
-    Text(
-        text = "Vivi is building your question…",
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Bold,
-        textAlign = TextAlign.Center
-    )
-    Spacer(Modifier.height(5.dp))
-    Text(
-        text = "Creating a Spanish translation and answer choices.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center
-    )
-}
-
-@Composable
-private fun QuestionErrorContent(
-    message: String?,
-    onRetry: () -> Unit
-) {
-    ViviMascot(
-        pose = ViviPose.ENCOURAGING,
-        modifier = Modifier.size(96.dp)
-    )
-    Spacer(Modifier.height(10.dp))
-    Text(
-        text = "That question did not load",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        textAlign = TextAlign.Center
-    )
-    Spacer(Modifier.height(6.dp))
-    Text(
-        text = message?.takeIf(String::isNotBlank)
-            ?: "Check your connection and try this object again.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center
-    )
-    Spacer(Modifier.height(18.dp))
-    OutlinedButton(
-        onClick = onRetry,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp)
+private fun ErrorContent(message: String, onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Icon(imageVector = Icons.Rounded.Refresh, contentDescription = null)
-        Spacer(Modifier.size(8.dp))
-        Text("Try again", fontWeight = FontWeight.Bold)
+        ViviMascot(pose = ViviPose.ENCOURAGING, modifier = Modifier.size(82.dp))
+        Text(
+            text = message,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Button(onClick = onRetry, shape = RoundedCornerShape(16.dp)) {
+            Icon(Icons.Rounded.Refresh, contentDescription = null)
+            Spacer(Modifier.size(8.dp))
+            Text("Try again")
+        }
     }
 }
 
 @Composable
 private fun QuestionContent(
     vocabulary: Vocabulary,
+    questionType: LessonQuestionType,
+    prompt: String,
+    correctAnswer: String,
     options: List<String>,
     selectedAnswer: String?,
     answerResult: LessonAnswerResult?,
     onAnswerSelected: (String) -> Unit,
-    onContinue: () -> Unit
+    onContinue: () -> Unit,
+    onSpeakEnglish: (String) -> Unit,
+    onSpeakSpanish: (String) -> Unit
 ) {
-    Text(
-        text = "What is “${vocabulary.englishWord.displayWord()}” in Spanish?",
-        style = MaterialTheme.typography.headlineSmall.copy(
-            fontSize = 25.sp,
-            lineHeight = 31.sp
-        ),
-        fontWeight = FontWeight.ExtraBold,
-        textAlign = TextAlign.Center,
-        color = MaterialTheme.colorScheme.onSurface
-    )
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            ViviMascot(
+                pose = when (answerResult) {
+                    LessonAnswerResult.CORRECT -> ViviPose.CORRECT
+                    LessonAnswerResult.INCORRECT -> ViviPose.ENCOURAGING
+                    null -> if (questionType == LessonQuestionType.TAP_OBJECT) {
+                        ViviPose.SCANNING
+                    } else {
+                        ViviPose.WELCOME
+                    }
+                },
+                modifier = Modifier.size(72.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = prompt,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                if (questionType == LessonQuestionType.TAP_OBJECT && answerResult == null) {
+                    Text(
+                        text = "Look past this card and tap a box in the photo.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
 
-    Spacer(Modifier.height(8.dp))
+        if (questionType != LessonQuestionType.TAP_OBJECT && answerResult == null) {
+            options.forEach { option ->
+                AnswerButton(
+                    text = option,
+                    onClick = { onAnswerSelected(option) }
+                )
+            }
+        }
 
-    Text(
-        text = "Choose the best translation",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
+        if (questionType == LessonQuestionType.TAP_OBJECT && answerResult == null) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = QuestGoldSoft,
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.TouchApp,
+                        contentDescription = null,
+                        tint = ExplorerBlueDark
+                    )
+                    Text(
+                        text = "Tap the matching object to submit your answer.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = ExplorerBlueDark
+                    )
+                }
+            }
+        }
 
-    Spacer(Modifier.height(20.dp))
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        options.forEach { option ->
-            AnswerOption(
-                text = option,
-                isSelected = selectedAnswer == option,
-                isCorrectOption = option.trim().equals(
-                    vocabulary.spanishWord.trim(),
-                    ignoreCase = true
-                ),
-                answerResult = answerResult,
-                onClick = { onAnswerSelected(option) }
+        AnimatedVisibility(
+            visible = answerResult != null,
+            enter = fadeIn() + scaleIn(initialScale = 0.96f)
+        ) {
+            AnswerFeedback(
+                vocabulary = vocabulary,
+                correctAnswer = correctAnswer,
+                selectedAnswer = selectedAnswer,
+                result = answerResult ?: LessonAnswerResult.INCORRECT,
+                onSpeakEnglish = onSpeakEnglish,
+                onSpeakSpanish = onSpeakSpanish
             )
         }
-    }
 
-    if (answerResult != null) {
-        Spacer(Modifier.height(18.dp))
-        AnswerFeedback(
-            vocabulary = vocabulary,
-            answerResult = answerResult
-        )
-        Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = onContinue,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-            shape = RoundedCornerShape(17.dp)
-        ) {
-            Text("Continue", fontWeight = FontWeight.Bold)
-            Spacer(Modifier.size(7.dp))
-            Icon(imageVector = Icons.Rounded.ArrowForward, contentDescription = null)
+        if (answerResult != null) {
+            Button(
+                onClick = onContinue,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(17.dp)
+            ) {
+                Text("Continue", fontWeight = FontWeight.Bold)
+                Spacer(Modifier.size(8.dp))
+                Icon(Icons.Rounded.ArrowForward, contentDescription = null)
+            }
         }
     }
 }
 
 @Composable
-private fun AnswerOption(
-    text: String,
-    isSelected: Boolean,
-    isCorrectOption: Boolean,
-    answerResult: LessonAnswerResult?,
-    onClick: () -> Unit
-) {
-    val hasAnswered = answerResult != null
-    val selectedWrong = hasAnswered && isSelected && !isCorrectOption
-    val revealCorrect = hasAnswered && isCorrectOption
-
-    val containerColor = when {
-        revealCorrect -> DiscoveryMintSoft
-        selectedWrong -> FriendlyCoralSoft
-        isSelected -> ExplorerBlueSoft
-        else -> MaterialTheme.colorScheme.surface
-    }
-    val borderColor = when {
-        revealCorrect -> SuccessGreen
-        selectedWrong -> FriendlyCoral
-        isSelected -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.outline
-    }
-    val contentColor = when {
-        revealCorrect -> SuccessGreen
-        selectedWrong -> FriendlyCoral
-        else -> MaterialTheme.colorScheme.onSurface
-    }
-
-    Surface(
+private fun AnswerButton(text: String, onClick: () -> Unit) {
+    OutlinedButton(
         onClick = onClick,
-        enabled = !hasAnswered,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(17.dp),
-        color = containerColor,
-        border = BorderStroke(if (revealCorrect || selectedWrong || isSelected) 2.dp else 1.dp, borderColor)
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp),
+        shape = RoundedCornerShape(17.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = contentColor
-            )
-
-            when {
-                revealCorrect -> Icon(
-                    imageVector = Icons.Rounded.Check,
-                    contentDescription = "Correct answer",
-                    tint = SuccessGreen
-                )
-                selectedWrong -> Icon(
-                    imageVector = Icons.Rounded.Close,
-                    contentDescription = "Incorrect answer",
-                    tint = FriendlyCoral
-                )
-                else -> Unit
-            }
-        }
+        Text(
+            text = text.displayWord(),
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Start,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
 @Composable
 private fun AnswerFeedback(
     vocabulary: Vocabulary,
-    answerResult: LessonAnswerResult
+    correctAnswer: String,
+    selectedAnswer: String?,
+    result: LessonAnswerResult,
+    onSpeakEnglish: (String) -> Unit,
+    onSpeakSpanish: (String) -> Unit
 ) {
-    val isCorrect = answerResult == LessonAnswerResult.CORRECT
-    val background = if (isCorrect) DiscoveryMintSoft else FriendlyCoralSoft
-    val accent = if (isCorrect) SuccessGreen else FriendlyCoral
-
+    val correct = result == LessonAnswerResult.CORRECT
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = background
+        color = if (correct) DiscoveryMintSoft else FriendlyCoralSoft,
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(15.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(9.dp)
             ) {
-                ViviMascot(
-                    pose = if (isCorrect) ViviPose.CORRECT else ViviPose.ENCOURAGING,
-                    modifier = Modifier.size(62.dp)
+                Icon(
+                    imageVector = if (correct) Icons.Rounded.CheckCircle else Icons.Rounded.Cancel,
+                    contentDescription = null,
+                    tint = if (correct) SuccessGreen else FriendlyCoral
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (isCorrect) "Great choice!" else "Nearly there!",
+                        text = if (correct) "Correct!" else "Good try!",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.ExtraBold,
-                        color = accent
+                        color = if (correct) SuccessGreen else FriendlyCoral
                     )
-                    Text(
-                        text = if (isCorrect) {
-                            "${vocabulary.spanishWord} means ${vocabulary.englishWord}."
-                        } else {
-                            "The answer is ${vocabulary.spanishWord}."
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    if (!correct && !selectedAnswer.isNullOrBlank()) {
+                        Text(
+                            text = "You chose ${selectedAnswer.displayWord()}.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = Color.White.copy(alpha = 0.72f)
-            ) {
-                Column(
-                    modifier = Modifier.padding(13.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = vocabulary.englishSentence,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = vocabulary.spanishSentence,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+            Text(
+                text = correctAnswer.displayWord(),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                TextButton(onClick = { onSpeakEnglish(vocabulary.englishWord) }) {
+                    Icon(Icons.Rounded.VolumeUp, contentDescription = null)
+                    Spacer(Modifier.size(5.dp))
+                    Text(vocabulary.englishWord.displayWord())
                 }
+                TextButton(onClick = { onSpeakSpanish(vocabulary.spanishWord) }) {
+                    Icon(Icons.Rounded.VolumeUp, contentDescription = null)
+                    Spacer(Modifier.size(5.dp))
+                    Text(vocabulary.spanishWord.displayWord())
+                }
+            }
+
+            if (vocabulary.englishSentence.isNotBlank()) {
+                Text(
+                    text = vocabulary.englishSentence,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            if (vocabulary.spanishSentence.isNotBlank()) {
+                Text(
+                    text = vocabulary.spanishSentence,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
     }
@@ -460,174 +422,151 @@ fun LessonCompleteCard(
     currentStreak: Int,
     dailyGoalReached: Boolean,
     onRestart: () -> Unit,
-    onChooseNewPhoto: () -> Unit,
-    modifier: Modifier = Modifier
+    onChooseNewPhoto: () -> Unit
 ) {
-    val safeTotal = totalQuestions.coerceAtLeast(1)
-    val accuracy = correctAnswers.toFloat() / safeTotal.toFloat()
-    val earnedStars = when {
-        accuracy >= 0.8f -> 3
-        accuracy >= 0.5f -> 2
-        else -> 1
-    }
-    val celebrationProgress = remember { Animatable(0f) }
+    CompletionCard(
+        title = "Quest complete!",
+        subtitle = if (correctAnswers == totalQuestions && totalQuestions > 0) {
+            "Perfect score — Vivi is impressed."
+        } else {
+            "$correctAnswers of $totalQuestions correct"
+        },
+        correctAnswers = correctAnswers,
+        totalQuestions = totalQuestions,
+        xpEarned = xpEarned,
+        extraLabel = "$newWords new words",
+        footer = when {
+            dailyGoalReached -> "Daily goal complete"
+            currentStreak > 0 -> "$currentStreak day streak"
+            else -> "Keep exploring"
+        },
+        primaryText = "Scan another photo",
+        primaryIcon = Icons.Rounded.PhotoCamera,
+        onPrimary = onChooseNewPhoto,
+        secondaryText = "Replay quest",
+        onSecondary = onRestart
+    )
+}
 
-    LaunchedEffect(correctAnswers, totalQuestions, xpEarned) {
-        celebrationProgress.snapTo(0f)
-        celebrationProgress.animateTo(
-            targetValue = 1f,
-            animationSpec = tween(durationMillis = 1700)
-        )
-    }
+@Composable
+fun ReviewCompleteCard(
+    correctAnswers: Int,
+    totalQuestions: Int,
+    xpEarned: Int,
+    onRestart: () -> Unit,
+    onDone: () -> Unit
+) {
+    CompletionCard(
+        title = "Review complete!",
+        subtitle = "$correctAnswers of $totalQuestions remembered",
+        correctAnswers = correctAnswers,
+        totalQuestions = totalQuestions,
+        xpEarned = xpEarned,
+        extraLabel = "Mastery updated",
+        footer = "Come back when more words are due",
+        primaryText = "Done",
+        primaryIcon = Icons.Rounded.CheckCircle,
+        onPrimary = onDone,
+        secondaryText = "Review again",
+        onSecondary = onRestart
+    )
+}
 
-    Box(
-        modifier = modifier
-            .widthIn(max = 390.dp)
-            .fillMaxWidth()
+@Composable
+private fun CompletionCard(
+    title: String,
+    subtitle: String,
+    correctAnswers: Int,
+    totalQuestions: Int,
+    xpEarned: Int,
+    extraLabel: String,
+    footer: String,
+    primaryText: String,
+    primaryIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    onPrimary: () -> Unit,
+    secondaryText: String,
+    onSecondary: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(30.dp),
+        shadowElevation = 14.dp
     ) {
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(32.dp)
+        Column(
+            modifier = Modifier.padding(22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp, vertical = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            ViviMascot(pose = ViviPose.COMPLETE, modifier = Modifier.size(116.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(9.dp)
             ) {
-                ViviMascot(
-                    pose = ViviPose.COMPLETE,
-                    modifier = Modifier.size(118.dp)
+                CompletionStat(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Rounded.CheckCircle,
+                    value = "$correctAnswers/$totalQuestions",
+                    label = "Correct",
+                    color = SuccessGreen
                 )
-
-                Text(
-                    text = "Quest complete!",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    textAlign = TextAlign.Center
+                CompletionStat(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Rounded.Bolt,
+                    value = "+$xpEarned",
+                    label = "XP",
+                    color = QuestGold
                 )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "You explored $totalQuestions ${if (totalQuestions == 1) "object" else "objects"} in this photo.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
+                CompletionStat(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Rounded.EmojiEvents,
+                    value = extraLabel.substringBefore(' '),
+                    label = extraLabel.substringAfter(' ', extraLabel),
+                    color = MaterialTheme.colorScheme.primary
                 )
+            }
 
-                Spacer(Modifier.height(14.dp))
+            Text(
+                text = footer,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = ExplorerBlueDark
+            )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    repeat(3) { index ->
-                        Icon(
-                            imageVector = if (index < earnedStars) Icons.Rounded.Star else Icons.Rounded.StarBorder,
-                            contentDescription = null,
-                            tint = QuestGold,
-                            modifier = Modifier.size(34.dp)
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(14.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    CompletionStat(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Rounded.Bolt,
-                        value = "+$xpEarned",
-                        label = "XP earned",
-                        containerColor = QuestGoldSoft
-                    )
-                    CompletionStat(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Rounded.CollectionsBookmark,
-                        value = newWords.toString(),
-                        label = if (newWords == 1) "new word" else "new words",
-                        containerColor = ExplorerBlueSoft
-                    )
-                }
-
-                Spacer(Modifier.height(10.dp))
-
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    color = DiscoveryMintSoft
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (dailyGoalReached) {
-                                Icons.Rounded.Check
-                            } else {
-                                Icons.Rounded.LocalFireDepartment
-                            },
-                            contentDescription = null,
-                            tint = SuccessGreen
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (dailyGoalReached) {
-                                    "Daily goal complete"
-                                } else {
-                                    "$correctAnswers / $totalQuestions correct"
-                                },
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (currentStreak > 0) {
-                                    "$currentStreak-day streak · Keep exploring tomorrow"
-                                } else {
-                                    "Every answer strengthens your collection"
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(20.dp))
-
-                Button(
-                    onClick = onRestart,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(17.dp)
-                ) {
-                    Icon(imageVector = Icons.Rounded.Refresh, contentDescription = null)
-                    Spacer(Modifier.size(8.dp))
-                    Text("Play this photo again", fontWeight = FontWeight.Bold)
-                }
-
-                Spacer(Modifier.height(10.dp))
-
-                OutlinedButton(
-                    onClick = onChooseNewPhoto,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    shape = RoundedCornerShape(17.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Text("Choose another photo", fontWeight = FontWeight.Bold)
-                }
+            Button(
+                onClick = onPrimary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(17.dp)
+            ) {
+                Icon(primaryIcon, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text(primaryText, fontWeight = FontWeight.Bold)
+            }
+            OutlinedButton(
+                onClick = onSecondary,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(17.dp)
+            ) {
+                Icon(Icons.Rounded.Replay, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text(secondaryText)
             }
         }
-
-        CompletionConfetti(
-            progress = celebrationProgress.value,
-            modifier = Modifier.matchParentSize()
-        )
     }
 }
 
@@ -637,72 +576,26 @@ private fun CompletionStat(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     value: String,
     label: String,
-    containerColor: Color
+    color: Color
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        color = containerColor
+        color = color.copy(alpha = 0.13f),
+        shape = RoundedCornerShape(17.dp)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 13.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 11.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(22.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
             Spacer(Modifier.height(4.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold
-            )
+            Text(value, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleSmall)
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
-        }
-    }
-}
-
-@Composable
-private fun CompletionConfetti(
-    progress: Float,
-    modifier: Modifier = Modifier
-) {
-    val colours = listOf(QuestGold, SuccessGreen, FriendlyCoral, MaterialTheme.colorScheme.primary)
-    Canvas(modifier = modifier) {
-        val fade = (1f - progress).coerceIn(0f, 1f)
-        val points = listOf(
-            0.08f to 0.05f,
-            0.22f to 0.12f,
-            0.40f to 0.03f,
-            0.62f to 0.10f,
-            0.80f to 0.04f,
-            0.92f to 0.16f,
-            0.13f to 0.30f,
-            0.87f to 0.34f
-        )
-        points.forEachIndexed { index, (x, startY) ->
-            val y = startY + progress * (0.28f + (index % 3) * 0.08f)
-            val colour = colours[index % colours.size].copy(alpha = fade)
-            if (index % 2 == 0) {
-                drawCircle(
-                    color = colour,
-                    radius = size.minDimension * 0.012f,
-                    center = Offset(size.width * x, size.height * y)
-                )
-            } else {
-                drawRect(
-                    color = colour,
-                    topLeft = Offset(size.width * x, size.height * y),
-                    size = Size(size.minDimension * 0.022f, size.minDimension * 0.010f)
-                )
-            }
         }
     }
 }
