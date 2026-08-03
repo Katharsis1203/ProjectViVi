@@ -2,6 +2,7 @@ package com.example.visualvocab.data.training
 
 import android.content.Context
 import android.graphics.Bitmap
+import com.example.visualvocab.domain.model.training.AnnotatedExample
 import com.example.visualvocab.domain.model.training.TrainingAnnotation
 import com.example.visualvocab.domain.repository.TrainingRepository
 import kotlinx.coroutines.Dispatchers
@@ -10,7 +11,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.OutputStream
 import java.util.Locale
@@ -138,6 +138,45 @@ class TrainingRepositoryImpl(
         )
     }
 
+    override suspend fun getExamples(): List<AnnotatedExample> = withContext(Dispatchers.IO) {
+        readDataset().examples.map { stored ->
+            AnnotatedExample(
+                id = stored.id,
+                imageFileName = stored.imageFileName,
+                imageWidth = stored.imageWidth,
+                imageHeight = stored.imageHeight,
+                createdAt = stored.createdAt,
+                annotations = stored.annotations.map { ann ->
+                    TrainingAnnotation(
+                        label = ann.label,
+                        left = ann.left,
+                        top = ann.top,
+                        right = ann.right,
+                        bottom = ann.bottom,
+                        originalLabel = ann.originalLabel,
+                        originalConfidence = ann.originalConfidence
+                    )
+                }
+            )
+        }
+    }
+
+    override suspend fun deleteExample(id: String) = withContext(Dispatchers.IO) {
+        val dataset = readDataset()
+        val example = dataset.examples.find { it.id == id } ?: return@withContext
+
+        val imageFile = File(imageDirectory, example.imageFileName)
+        if (imageFile.exists()) {
+            imageFile.delete()
+        }
+
+        writeDataset(
+            dataset.copy(
+                examples = dataset.examples.filter { it.id != id }
+            )
+        )
+    }
+
     override suspend fun exportDataset(
         outputStream: OutputStream
     ) = withContext(Dispatchers.IO) {
@@ -208,13 +247,7 @@ class TrainingRepositoryImpl(
                             index.toString() to
                                     name
                         }
-                        .toMap(),
-                input_size =
-                    DEFAULT_MODEL_INPUT_SIZE,
-                dataset_format =
-                    "ultralytics-yolo",
-                dataset_version =
-                    DATASET_FORMAT_VERSION
+                        .toMap()
             )
 
         val datasetYaml =
@@ -285,16 +318,6 @@ class TrainingRepositoryImpl(
         }
     }
 
-    override suspend fun exportDatasetToByteArray():
-            ByteArray =
-        withContext(Dispatchers.IO) {
-            ByteArrayOutputStream()
-                .use { output ->
-                    exportDataset(output)
-                    output.toByteArray()
-                }
-        }
-
     override suspend fun getExampleCount():
             Int =
         withContext(Dispatchers.IO) {
@@ -326,53 +349,23 @@ class TrainingRepositoryImpl(
                             ?: return@mapNotNull null
 
                     val left =
-                        annotation.left
-                            .coerceIn(
-                                0f,
-                                1f
-                            )
-
+                        annotation.left.coerceIn(0f, 1f)
                     val top =
-                        annotation.top
-                            .coerceIn(
-                                0f,
-                                1f
-                            )
-
+                        annotation.top.coerceIn(0f, 1f)
                     val right =
-                        annotation.right
-                            .coerceIn(
-                                0f,
-                                1f
-                            )
-
+                        annotation.right.coerceIn(0f, 1f)
                     val bottom =
-                        annotation.bottom
-                            .coerceIn(
-                                0f,
-                                1f
-                            )
+                        annotation.bottom.coerceIn(0f, 1f)
 
-                    val width =
-                        right - left
+                    val width = right - left
+                    val height = bottom - top
 
-                    val height =
-                        bottom - top
-
-                    if (
-                        width <= 0f ||
-                        height <= 0f
-                    ) {
+                    if (width <= 0f || height <= 0f) {
                         return@mapNotNull null
                     }
 
-                    val centerX =
-                        left +
-                                width / 2f
-
-                    val centerY =
-                        top +
-                                height / 2f
+                    val centerX = left + width / 2f
+                    val centerY = top + height / 2f
 
                     String.format(
                         Locale.US,
@@ -387,14 +380,7 @@ class TrainingRepositoryImpl(
 
         return lines.joinToString(
             separator = "\n",
-            postfix =
-                if (
-                    lines.isNotEmpty()
-                ) {
-                    "\n"
-                } else {
-                    ""
-                }
+            postfix = if (lines.isNotEmpty()) "\n" else ""
         )
     }
 
@@ -403,13 +389,11 @@ class TrainingRepositoryImpl(
         List<String>
     ): String {
         return buildString {
+            appendLine("# Note: This dataset uses the same folder for train and val.")
+            appendLine("# A proper split should be created externally before serious training.")
             appendLine("path: .")
-            appendLine(
-                "train: images"
-            )
-            appendLine(
-                "val: images"
-            )
+            appendLine("train: images")
+            appendLine("val: images")
             appendLine("names:")
 
             classNames.forEachIndexed {
@@ -564,10 +548,7 @@ class TrainingRepositoryImpl(
     @Serializable
     private data class YoloClassesMetadata(
         val names:
-        Map<String, String>,
-        val input_size: Int,
-        val dataset_format: String,
-        val dataset_version: Int
+        Map<String, String>
     )
 
     companion object {
@@ -582,11 +563,5 @@ class TrainingRepositoryImpl(
 
         private const val JPEG_QUALITY =
             92
-
-        private const val DEFAULT_MODEL_INPUT_SIZE =
-            640
-
-        private const val DATASET_FORMAT_VERSION =
-            1
     }
 }

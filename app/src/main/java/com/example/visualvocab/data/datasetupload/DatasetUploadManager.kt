@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.visualvocab.BuildConfig
 import com.example.visualvocab.data.modelupdate.ModelUpdateManager
 import com.example.visualvocab.domain.repository.TrainingRepository
+import java.io.ByteArrayOutputStream
 
 class DatasetUploadManager(
     context: Context,
@@ -21,7 +22,11 @@ class DatasetUploadManager(
             "No saved training examples are available to upload."
         }
 
-        val datasetZip = trainingRepository.exportDatasetToByteArray()
+        val datasetZip = ByteArrayOutputStream().use { output ->
+            trainingRepository.exportDataset(output)
+            output.toByteArray()
+        }
+        
         val metadata = UploadMetadata(
             installationId = installationIdProvider.getInstallationId(),
             modelVersion = modelUpdateManager.getCurrentVersion(),
