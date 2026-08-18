@@ -7,12 +7,14 @@ import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest
 
+// this class checks if a downloaded model is actually what it claims to be and works correctly.
 class ModelPackageValidator(
     context: Context
 ) {
     private val appContext =
         context.applicationContext
 
+    // run several checks on the model and metadata files.
     fun validate(
         manifest: ModelManifest,
         modelFile: File,
@@ -26,6 +28,7 @@ class ModelPackageValidator(
             "Downloaded classes file is missing."
         }
 
+        // check the hash to make sure the file didn't get corrupted during download.
         require(
             sha256(modelFile)
                 .equals(
@@ -52,6 +55,7 @@ class ModelPackageValidator(
                 metadataFile = metadataFile
             )
 
+        // try loading the labels to see if they are valid.
         val metadata =
             YoloModelMetadata.load(
                 appContext,
@@ -65,6 +69,7 @@ class ModelPackageValidator(
             "The downloaded model contains no class labels."
         }
 
+        // try opening the model with the interpreter to see if it's a real TFLite file.
         Interpreter(
             modelFile,
             Interpreter.Options()
@@ -80,6 +85,7 @@ class ModelPackageValidator(
                     .getOutputTensor(0)
                     .shape()
 
+            // make sure the input and output shapes match expectations.
             require(
                 inputShape.size == 4 &&
                     inputShape[0] == 1
@@ -130,6 +136,7 @@ class ModelPackageValidator(
         }
     }
 
+    // calculate the SHA-256 hash of a file.
     private fun sha256(
         file: File
     ): String {

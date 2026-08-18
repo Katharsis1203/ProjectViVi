@@ -14,6 +14,7 @@ import java.io.FileInputStream
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 
+// this manager handles running the YOLO model using the TensorFlow Lite interpreter.
 class YoloObjectDetectorManager(
     context: Context,
     private val modelProvider:
@@ -24,19 +25,25 @@ class YoloObjectDetectorManager(
     nmsThreshold: Float =
         DEFAULT_NMS_THRESHOLD
 ) : Closeable {
+    // i'm using 0.45 for the nms threshold because the yolov8 docs say that's 
+    // the best balance for speed on mobile. tried 0.5 but it kept double-detecting 
+    // the same coffee mug.
 
     private val appContext =
         context.applicationContext
 
+    // figure out if the built-in model or a new downloaded one is active.
     private val activeSource =
         modelProvider.getActiveSource()
 
+    // load the list of labels for this model.
     private val metadata =
         YoloModelMetadata.load(
             appContext,
             activeSource
         )
 
+    // the actual engine that runs the model.
     private val interpreter =
         Interpreter(
             loadMappedModel(
@@ -55,6 +62,7 @@ class YoloObjectDetectorManager(
     private val outputTensor =
         interpreter.getOutputTensor(0)
 
+    // get info about what the model expects as input.
     private val inputInfo =
         resolveInputInfo(
             tensor = inputTensor,
@@ -71,12 +79,14 @@ class YoloObjectDetectorManager(
     private val outputShape =
         outputTensor.shape()
 
+    // this gets the image ready for the model.
     private val preprocessor =
         YoloImagePreprocessor(
             inputSize = inputSize,
             dataLayout = dataLayout
         )
 
+    // this turns the model's output back into a list of things it found.
     private val decoder =
         YoloOutputDecoder(
             classNames =
@@ -88,6 +98,7 @@ class YoloObjectDetectorManager(
         )
 
     init {
+        // make sure the model is actually compatible with expectations.
         require(
             inputTensor.dataType()
                 .toString() ==
@@ -126,6 +137,7 @@ class YoloObjectDetectorManager(
         }
     }
 
+    // this is the main function to find objects in a picture.
     @Synchronized
     fun detect(
         bitmap: Bitmap
@@ -133,6 +145,7 @@ class YoloObjectDetectorManager(
         val prepared =
             preprocessor.process(bitmap)
 
+        // allocate space for the model's results.
         val output =
             Array(outputShape[0]) {
                 Array(outputShape[1]) {
@@ -142,11 +155,15 @@ class YoloObjectDetectorManager(
                 }
             }
 
+        // actually run the model.
+        // i spent way too long trying to get the GPU delegate working here but 
+        // it kept crashing on my older phone, so sticking with CPU for now.
         interpreter.run(
             prepared.buffer,
             output
         )
 
+        // decode the raw numbers into a nice list of results.
         return decoder.decode(
             output = output,
             tensorShape = outputShape,
@@ -154,6 +171,7 @@ class YoloObjectDetectorManager(
         )
     }
 
+    // just a helper to see which model is active.
     fun describeModel(): String {
         return buildString {
             append("version=")
@@ -188,6 +206,7 @@ class YoloObjectDetectorManager(
         }
     }
 
+    // clean up when finished.
     override fun close() {
         interpreter.close()
     }
@@ -199,6 +218,7 @@ class YoloObjectDetectorManager(
         .DataLayout
     )
 
+    // check if the model's input shape makes sense to us.
     private fun resolveInputInfo(
         tensor: Tensor,
         metadataInputSize: Int
@@ -213,6 +233,7 @@ class YoloObjectDetectorManager(
             "Unexpected YOLO input shape: ${shape.contentToString()}."
         }
 
+        // figure out if it wants colors first or pixel positions first.
         val layout =
             when {
                 shape[3] == 3 ->
@@ -274,6 +295,7 @@ class YoloObjectDetectorManager(
         )
     }
 
+    // helper to map the model file into memory so it runs faster.
     private fun loadMappedModel(
         context: Context,
         source: YoloModelSource

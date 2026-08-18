@@ -1,5 +1,6 @@
 package com.example.visualvocab.data.modelupdate
 
+// this class holds info about a potential update and shows if it's newer than the current one.
 data class ModelUpdateInfo(
     val manifest: ModelManifest,
     val currentVersion: String
@@ -11,6 +12,7 @@ data class ModelUpdateInfo(
                 currentVersion
             ) > 0
 
+    // a simple way to compare two version strings like "v1.2" and "v1.1".
     private fun compareVersions(
         first: String,
         second: String

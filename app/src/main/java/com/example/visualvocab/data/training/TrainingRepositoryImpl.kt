@@ -2,6 +2,7 @@ package com.example.visualvocab.data.training
 
 import android.content.Context
 import android.graphics.Bitmap
+import com.example.visualvocab.domain.model.training.AnnotatedExample
 import com.example.visualvocab.domain.model.training.TrainingAnnotation
 import com.example.visualvocab.domain.repository.TrainingRepository
 import kotlinx.coroutines.Dispatchers
@@ -10,7 +11,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.OutputStream
 import java.util.Locale
@@ -18,6 +18,7 @@ import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
+// this repository handles saving and exporting images and labels for training our AI.
 class TrainingRepositoryImpl(
     context: Context
 ) : TrainingRepository {
@@ -32,6 +33,7 @@ class TrainingRepositoryImpl(
             ignoreUnknownKeys = true
         }
 
+    // main folder for training data.
     private val rootDirectory: File
         get() =
             File(
@@ -39,6 +41,7 @@ class TrainingRepositoryImpl(
                 TRAINING_DIRECTORY
             )
 
+    // folder where the photos are stored.
     private val imageDirectory: File
         get() =
             File(
@@ -46,6 +49,7 @@ class TrainingRepositoryImpl(
                 IMAGE_DIRECTORY
             )
 
+    // file that keeps track of all the metadata.
     private val metadataFile: File
         get() =
             File(
@@ -53,11 +57,13 @@ class TrainingRepositoryImpl(
                 METADATA_FILE
             )
 
+    // save a new photo and its labels to the phone.
     override suspend fun saveExample(
         bitmap: Bitmap,
         annotations:
         List<TrainingAnnotation>
     ) = withContext(Dispatchers.IO) {
+        // at least one label is needed to save anything.
         require(
             annotations.isNotEmpty()
         ) {
@@ -79,6 +85,7 @@ class TrainingRepositoryImpl(
                 imageFileName
             )
 
+        // save the bitmap as a JPEG file.
         imageFile
             .outputStream()
             .use { output ->
@@ -97,6 +104,7 @@ class TrainingRepositoryImpl(
         val dataset =
             readDataset()
 
+        // create the metadata for this example.
         val storedExample =
             StoredTrainingExample(
                 id = exampleId,
@@ -129,6 +137,7 @@ class TrainingRepositoryImpl(
                     }
             )
 
+        // update the main dataset file.
         writeDataset(
             dataset.copy(
                 examples =
@@ -138,6 +147,48 @@ class TrainingRepositoryImpl(
         )
     }
 
+    // get all the examples saved so far.
+    override suspend fun getExamples(): List<AnnotatedExample> = withContext(Dispatchers.IO) {
+        readDataset().examples.map { stored ->
+            AnnotatedExample(
+                id = stored.id,
+                imageFileName = stored.imageFileName,
+                imageWidth = stored.imageWidth,
+                imageHeight = stored.imageHeight,
+                createdAt = stored.createdAt,
+                annotations = stored.annotations.map { ann ->
+                    TrainingAnnotation(
+                        label = ann.label,
+                        left = ann.left,
+                        top = ann.top,
+                        right = ann.right,
+                        bottom = ann.bottom,
+                        originalLabel = ann.originalLabel,
+                        originalConfidence = ann.originalConfidence
+                    )
+                }
+            )
+        }
+    }
+
+    // delete an example and its photo.
+    override suspend fun deleteExample(id: String) = withContext(Dispatchers.IO) {
+        val dataset = readDataset()
+        val example = dataset.examples.find { it.id == id } ?: return@withContext
+
+        val imageFile = File(imageDirectory, example.imageFileName)
+        if (imageFile.exists()) {
+            imageFile.delete()
+        }
+
+        writeDataset(
+            dataset.copy(
+                examples = dataset.examples.filter { it.id != id }
+            )
+        )
+    }
+
+    // bundle all the examples into a ZIP file to upload.
     override suspend fun exportDataset(
         outputStream: OutputStream
     ) = withContext(Dispatchers.IO) {
@@ -150,6 +201,7 @@ class TrainingRepositoryImpl(
             "No training examples have been saved."
         }
 
+        // find all the unique labels used.
         val classNames =
             dataset.examples
                 .flatMap {
@@ -208,13 +260,7 @@ class TrainingRepositoryImpl(
                             index.toString() to
                                     name
                         }
-                        .toMap(),
-                input_size =
-                    DEFAULT_MODEL_INPUT_SIZE,
-                dataset_format =
-                    "ultralytics-yolo",
-                dataset_version =
-                    DATASET_FORMAT_VERSION
+                        .toMap()
             )
 
         val datasetYaml =
@@ -222,6 +268,7 @@ class TrainingRepositoryImpl(
                 classNames
             )
 
+        // start building the ZIP file.
         ZipOutputStream(
             outputStream.buffered()
         ).use { zip ->
@@ -234,6 +281,7 @@ class TrainingRepositoryImpl(
                         example.imageFileName
                     )
 
+                // add the photo to the ZIP.
                 writeFileEntry(
                     zip = zip,
                     entryName =
@@ -248,6 +296,7 @@ class TrainingRepositoryImpl(
                         ) +
                             ".txt"
 
+                // create and add the YOLO format label file.
                 val labelText =
                     createYoloLabelText(
                         example =
@@ -265,6 +314,7 @@ class TrainingRepositoryImpl(
                 )
             }
 
+            // add the configuration files for training.
             writeTextEntry(
                 zip = zip,
                 entryName =
@@ -285,16 +335,6 @@ class TrainingRepositoryImpl(
         }
     }
 
-    override suspend fun exportDatasetToByteArray():
-            ByteArray =
-        withContext(Dispatchers.IO) {
-            ByteArrayOutputStream()
-                .use { output ->
-                    exportDataset(output)
-                    output.toByteArray()
-                }
-        }
-
     override suspend fun getExampleCount():
             Int =
         withContext(Dispatchers.IO) {
@@ -303,6 +343,7 @@ class TrainingRepositoryImpl(
                 .size
         }
 
+    // helper to format labels into the specific text format YOLO expects.
     private fun createYoloLabelText(
         example:
         StoredTrainingExample,
@@ -326,54 +367,25 @@ class TrainingRepositoryImpl(
                             ?: return@mapNotNull null
 
                     val left =
-                        annotation.left
-                            .coerceIn(
-                                0f,
-                                1f
-                            )
-
+                        annotation.left.coerceIn(0f, 1f)
                     val top =
-                        annotation.top
-                            .coerceIn(
-                                0f,
-                                1f
-                            )
-
+                        annotation.top.coerceIn(0f, 1f)
                     val right =
-                        annotation.right
-                            .coerceIn(
-                                0f,
-                                1f
-                            )
-
+                        annotation.right.coerceIn(0f, 1f)
                     val bottom =
-                        annotation.bottom
-                            .coerceIn(
-                                0f,
-                                1f
-                            )
+                        annotation.bottom.coerceIn(0f, 1f)
 
-                    val width =
-                        right - left
+                    val width = right - left
+                    val height = bottom - top
 
-                    val height =
-                        bottom - top
-
-                    if (
-                        width <= 0f ||
-                        height <= 0f
-                    ) {
+                    if (width <= 0f || height <= 0f) {
                         return@mapNotNull null
                     }
 
-                    val centerX =
-                        left +
-                                width / 2f
+                    val centerX = left + width / 2f
+                    val centerY = top + height / 2f
 
-                    val centerY =
-                        top +
-                                height / 2f
-
+                    // format: class_id center_x center_y width height (all normalized 0-1)
                     String.format(
                         Locale.US,
                         "%d %.6f %.6f %.6f %.6f",
@@ -387,29 +399,21 @@ class TrainingRepositoryImpl(
 
         return lines.joinToString(
             separator = "\n",
-            postfix =
-                if (
-                    lines.isNotEmpty()
-                ) {
-                    "\n"
-                } else {
-                    ""
-                }
+            postfix = if (lines.isNotEmpty()) "\n" else ""
         )
     }
 
+    // create the YAML configuration file for training.
     private fun createDatasetYaml(
         classNames:
         List<String>
     ): String {
         return buildString {
+            appendLine("# Note: This dataset uses the same folder for train and val.")
+            appendLine("# A proper split should be created externally before serious training.")
             appendLine("path: .")
-            appendLine(
-                "train: images"
-            )
-            appendLine(
-                "val: images"
-            )
+            appendLine("train: images")
+            appendLine("val: images")
             appendLine("names:")
 
             classNames.forEachIndexed {
@@ -428,6 +432,7 @@ class TrainingRepositoryImpl(
         }
     }
 
+    // helper to make sure strings are safe for YAML.
     private fun quoteYamlString(
         value: String
     ): String {
@@ -479,6 +484,7 @@ class TrainingRepositoryImpl(
         zip.closeEntry()
     }
 
+    // make labels consistent (lowercase, no extra spaces).
     private fun normalizeLabel(
         value: String
     ): String {
@@ -494,6 +500,7 @@ class TrainingRepositoryImpl(
         imageDirectory.mkdirs()
     }
 
+    // read all the saved example metadata from the JSON file.
     private fun readDataset():
             StoredDataset {
         ensureDirectories()
@@ -518,6 +525,7 @@ class TrainingRepositoryImpl(
         }
     }
 
+    // write all the example metadata back to the JSON file.
     private fun writeDataset(
         dataset: StoredDataset
     ) {
@@ -564,10 +572,7 @@ class TrainingRepositoryImpl(
     @Serializable
     private data class YoloClassesMetadata(
         val names:
-        Map<String, String>,
-        val input_size: Int,
-        val dataset_format: String,
-        val dataset_version: Int
+        Map<String, String>
     )
 
     companion object {
@@ -582,11 +587,5 @@ class TrainingRepositoryImpl(
 
         private const val JPEG_QUALITY =
             92
-
-        private const val DEFAULT_MODEL_INPUT_SIZE =
-            640
-
-        private const val DATASET_FORMAT_VERSION =
-            1
     }
 }

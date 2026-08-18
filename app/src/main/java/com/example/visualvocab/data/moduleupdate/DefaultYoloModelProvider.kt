@@ -3,14 +3,8 @@ package com.example.visualvocab.data.modelupdate
 import android.content.Context
 import java.io.File
 
-/**
- * Chooses a validated downloaded model when one exists.
- *
- * Otherwise, it falls back to the model bundled in app/src/main/assets.
- *
- * Phase 1 only prepares this selection layer. Phase 2 will add installation,
- * manifests, checksums, and model downloads.
- */
+// this class helps the app choose which YOLO model to use.
+// it checks for a newer downloaded one, otherwise it just uses the one that came with the app.
 class DefaultYoloModelProvider(
     context: Context,
     private val bundledModelAssetName: String =
@@ -24,6 +18,7 @@ class DefaultYoloModelProvider(
     private val appContext =
         context.applicationContext
 
+    // where downloaded models are kept.
     private val activeDirectory: File
         get() =
             File(
@@ -52,6 +47,7 @@ class DefaultYoloModelProvider(
                 VERSION_FILE_NAME
             )
 
+    // tells if the model should load from the phone's files or from the app's assets.
     override fun getActiveSource():
         YoloModelSource {
 
@@ -75,6 +71,7 @@ class DefaultYoloModelProvider(
         }
     }
 
+    // returns the version string of the model currently in use.
     override fun getActiveVersion(): String {
         return if (
             downloadedModelFile.isFile &&

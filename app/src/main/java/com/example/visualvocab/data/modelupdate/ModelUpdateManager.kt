@@ -1,5 +1,6 @@
 package com.example.visualvocab.data.modelupdate
 
+// this manager coordinates checking for, downloading, and installing model updates.
 class ModelUpdateManager(
     private val modelProvider:
         YoloModelProvider,
@@ -20,6 +21,7 @@ class ModelUpdateManager(
             .getActiveVersion()
     }
 
+    // check the web for a new manifest and compare it to our current version.
     suspend fun checkForUpdate():
         ModelUpdateInfo {
 
@@ -36,6 +38,7 @@ class ModelUpdateManager(
         )
     }
 
+    // download the new model files and install them if they are good.
     suspend fun downloadAndInstall(
         manifest: ModelManifest
     ) {
@@ -43,6 +46,7 @@ class ModelUpdateManager(
             .preparePendingDirectory()
 
         try {
+            // download both the model and the labels.
             downloadClient
                 .downloadFile(
                     sourceUrl =
@@ -61,6 +65,7 @@ class ModelUpdateManager(
                             .pendingMetadataFile
                 )
 
+            // make sure everything is okay before swapping it out.
             validator.validate(
                 manifest = manifest,
                 modelFile =
@@ -71,12 +76,14 @@ class ModelUpdateManager(
                         .pendingMetadataFile
             )
 
+            // actually install it.
             installer.install(
                 manifest
             )
         } catch (
             exception: Exception
         ) {
+            // if anything failed, clean up the mess.
             fileStore.clearPending()
             throw exception
         }

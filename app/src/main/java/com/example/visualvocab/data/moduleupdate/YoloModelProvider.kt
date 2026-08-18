@@ -1,14 +1,11 @@
 package com.example.visualvocab.data.modelupdate
 
-/**
- * Supplies the YOLO model package that should currently be used.
- *
- * The detector does not need to know whether the package came from the APK
- * or was downloaded after installation.
- */
+// this interface defines how the app gets its current YOLO model package.
 interface YoloModelProvider {
 
+    // get the source where the model files are located.
     fun getActiveSource(): YoloModelSource
 
+    // get the version name of the current model.
     fun getActiveVersion(): String
 }

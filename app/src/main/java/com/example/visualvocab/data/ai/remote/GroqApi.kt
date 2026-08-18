@@ -1,8 +1,6 @@
 package com.example.visualvocab.data.ai.remote
 
-// This structure usually implies a Retrofit interface, 
-// but since we use OkHttp directly in GroqManager, 
-// we can define the contract here if we want to abstract it further.
+// this interface is like a plan for how to talk to the Groq AI.
 interface GroqApi {
-    // Contract for Groq API if needed
+    // contract for Groq API if needed
 }

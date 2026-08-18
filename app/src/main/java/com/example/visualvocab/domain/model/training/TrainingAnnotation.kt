@@ -1,5 +1,6 @@
 package com.example.visualvocab.domain.model.training
 
+// this class stores a single label on a photo, showing where the object is.
 data class TrainingAnnotation(
     val label: String,
     val left: Float,
@@ -10,6 +11,7 @@ data class TrainingAnnotation(
     val originalConfidence: Float? = null
 ) {
     init {
+        // the label must not be empty and the coordinates must be sensible.
         require(label.isNotBlank()) {
             "Annotation label cannot be blank."
         }

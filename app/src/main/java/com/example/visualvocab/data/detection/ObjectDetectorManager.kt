@@ -9,6 +9,7 @@ import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.objectdetector.ObjectDetector
 import java.util.Locale
 
+// this class manages the efficient object detector from MediaPipe.
 class ObjectDetectorManager(private val context: Context) {
 
     private var detector: ObjectDetector? = null
@@ -17,6 +18,7 @@ class ObjectDetectorManager(private val context: Context) {
         setupDetector()
     }
 
+    // set up the detector with our model file.
     private fun setupDetector() {
         val baseOptions = BaseOptions.builder()
             .setModelAssetPath("efficient2.tflite")
@@ -32,11 +34,14 @@ class ObjectDetectorManager(private val context: Context) {
         detector = ObjectDetector.createFromOptions(context, detectorOptions)
     }
 
+    // run the detection on a bitmap.
     fun detect(bitmap: Bitmap): List<DetectionResult> {
+        // the bitmap needs to be in the right format.
         val argbBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
         val mpImage = BitmapImageBuilder(argbBitmap).build()
         val detectionResult = detector?.detect(mpImage)
 
+        // turn the results into our domain objects.
         return detectionResult?.detections()?.mapNotNull { detection ->
             val bestCategory = detection.categories().maxByOrNull { it.score() }
             bestCategory?.let { category ->
@@ -49,11 +54,13 @@ class ObjectDetectorManager(private val context: Context) {
         } ?: emptyList()
     }
 
+    // free up memory when finished.
     fun close() {
         detector?.close()
         detector = null
     }
 
+    // fix some labels so they sound more like what a person would say.
     private fun makeFriendlyLabel(rawLabel: String): String {
         val normalisedLabel = when (rawLabel.lowercase(Locale.getDefault())) {
             "tv" -> "Television"

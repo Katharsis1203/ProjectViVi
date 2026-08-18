@@ -2,6 +2,7 @@ package com.example.visualvocab.data.modelupdate
 
 import kotlinx.serialization.Serializable
 
+// this data class describes a new model version available to download.
 @Serializable
 data class ModelManifest(
     val version: String,

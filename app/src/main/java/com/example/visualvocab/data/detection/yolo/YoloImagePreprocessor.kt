@@ -9,6 +9,7 @@ import java.nio.ByteOrder
 import kotlin.math.min
 import kotlin.math.roundToInt
 
+// this class gets images ready for the YOLO model to read.
 internal class YoloImagePreprocessor(
     private val inputSize: Int,
     private val dataLayout: DataLayout
@@ -19,6 +20,7 @@ internal class YoloImagePreprocessor(
         NCHW
     }
 
+    // information about the processed image so the app can fix the box coordinates later.
     data class Result(
         val buffer: ByteBuffer,
         val scale: Float,
@@ -28,6 +30,7 @@ internal class YoloImagePreprocessor(
         val originalHeight: Int
     )
 
+    // resize the image and add padding to make it square.
     fun process(
         bitmap: Bitmap
     ): Result {
@@ -51,6 +54,7 @@ internal class YoloImagePreprocessor(
                 )
             }
 
+        // figure out how much to shrink the image.
         val scale =
             min(
                 inputSize /
@@ -69,6 +73,9 @@ internal class YoloImagePreprocessor(
                 .roundToInt()
                 .coerceAtLeast(1)
 
+        // calculate padding to center the image.
+        // n = (640 - 640*scale) / 2 ... basically just centering the scaled bit
+        // so the model sees the object in the middle of its square.
         val paddingX =
             (inputSize - resizedWidth) /
                 2f
@@ -87,6 +94,7 @@ internal class YoloImagePreprocessor(
         val canvas =
             Canvas(letterboxed)
 
+        // fill background with a neutral grey color.
         canvas.drawColor(
             Color.rgb(
                 LETTERBOX_VALUE,
@@ -128,6 +136,7 @@ internal class YoloImagePreprocessor(
             inputSize
         )
 
+        // allocate a buffer for the model input.
         val buffer =
             ByteBuffer.allocateDirect(
                 1 *
@@ -139,6 +148,9 @@ internal class YoloImagePreprocessor(
                 ByteOrder.nativeOrder()
             )
 
+        // put the pixel values into the buffer in the format the model wants.
+        // i have to divide by 255 here to get the 0.0-1.0 range the yolo model needs.
+        // bit of a pain doing this pixel by pixel but at least it's simple to understand.
         if (dataLayout == DataLayout.NHWC) {
             pixels.forEach { pixel ->
                 buffer.putFloat(

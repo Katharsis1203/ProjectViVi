@@ -8,6 +8,7 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
+// this class is for downloading new AI models from the web.
 class ModelDownloadClient {
 
     private val json =
@@ -15,6 +16,7 @@ class ModelDownloadClient {
             ignoreUnknownKeys = true
         }
 
+    // get the manifest file that tells us about the latest model version.
     suspend fun fetchManifest(
         manifestUrl: String
     ): ModelManifest =
@@ -29,6 +31,7 @@ class ModelDownloadClient {
             )
         }
 
+    // download the actual model file and save it to the phone.
     suspend fun downloadFile(
         sourceUrl: String,
         destination: File
@@ -57,6 +60,7 @@ class ModelDownloadClient {
         }
     }
 
+    // helper to just download some text from a URL.
     private fun downloadText(
         sourceUrl: String
     ): String {
@@ -76,6 +80,7 @@ class ModelDownloadClient {
         }
     }
 
+    // sets up the HTTP connection with the right settings and error checking.
     private fun openConnection(
         sourceUrl: String
     ): HttpURLConnection {
@@ -112,6 +117,7 @@ class ModelDownloadClient {
         val responseCode =
             connection.responseCode
 
+        // if the server says no, the app stops and throws an error.
         if (
             responseCode !in
             200..299
