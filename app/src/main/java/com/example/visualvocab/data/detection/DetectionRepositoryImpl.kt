@@ -25,7 +25,7 @@ class DetectionRepositoryImpl(
     private val appContext =
         context.applicationContext
 
-    // we try to set up the YOLO detector, but it might not work on all phones.
+    // setting up the YOLO detector, but it might not work on all phones.
     private val yoloDetectorManager =
         try {
             YoloObjectDetectorManager(
@@ -35,7 +35,7 @@ class DetectionRepositoryImpl(
             null
         }
 
-    // we use a combined manager to handle both detectors at once.
+    // a combined manager handles both detectors at once.
     private val combinedDetectorManager =
         CombinedObjectDetectorManager(
             efficientDetector =

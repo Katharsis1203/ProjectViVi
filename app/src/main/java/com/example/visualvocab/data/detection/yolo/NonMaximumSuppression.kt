@@ -21,7 +21,7 @@ internal object NonMaximumSuppression {
         val results =
             mutableListOf<DetectionResult>()
 
-        // we do this for each type of object separately.
+        // this happens for each type of object separately.
         detections
             .groupBy {
                 it.label

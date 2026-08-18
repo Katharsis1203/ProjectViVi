@@ -3,7 +3,7 @@ package com.example.visualvocab.data.modelupdate
 import android.content.Context
 import java.io.File
 
-// this class manages where we store our AI model files on the phone's storage.
+// this class manages where the AI model files are stored on the phone.
 class ModelFileStore(
     context: Context
 ) {
@@ -26,7 +26,7 @@ class ModelFileStore(
                 "active"
             )
 
-    // where we put a new model while it's still downloading.
+    // where the app puts a new model while it's still downloading.
     val pendingDirectory: File
         get() =
             File(
@@ -34,7 +34,7 @@ class ModelFileStore(
                 "pending"
             )
 
-    // a backup of the previous model in case we need it.
+    // a backup of the previous model in case it's needed.
     val previousDirectory: File
         get() =
             File(
@@ -86,7 +86,7 @@ class ModelFileStore(
                 "manifest.json"
             )
 
-    // clean out the pending folder so we can start a new download.
+    // clean out the pending folder so a new download can start.
     fun preparePendingDirectory() {
         pendingDirectory
             .deleteRecursively()
@@ -98,7 +98,7 @@ class ModelFileStore(
         }
     }
 
-    // just delete the pending files if we don't need them anymore.
+    // just delete the pending files if they are not needed anymore.
     fun clearPending() {
         pendingDirectory
             .deleteRecursively()

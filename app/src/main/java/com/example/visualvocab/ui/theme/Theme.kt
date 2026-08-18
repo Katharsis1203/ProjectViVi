@@ -94,7 +94,7 @@ private object ColorTokens {
     val DarkErrorContainer = androidx.compose.ui.graphics.Color(0xFF7A2930)
 }
 
-// the main theme function that we use to wrap our whole app UI.
+// the main theme function used to wrap the whole app UI.
 @Composable
 fun VisualVocabTheme(
     darkTheme: Boolean = false,

@@ -5,7 +5,7 @@ import com.example.visualvocab.data.detection.yolo.NonMaximumSuppression
 import com.example.visualvocab.data.detection.yolo.YoloObjectDetectorManager
 import com.example.visualvocab.domain.model.DetectionResult
 
-// this class is for putting together results from two different object detectors so we get the best list.
+// this class puts together results from two different object detectors for the best list.
 class CombinedObjectDetectorManager(
     private val efficientDetector:
         ObjectDetectorManager,
@@ -13,7 +13,7 @@ class CombinedObjectDetectorManager(
         YoloObjectDetectorManager?
 ) {
 
-    // we run both detectors and then mix their results.
+    // both detectors run and then the results mix.
     fun detect(
         bitmap: Bitmap
     ): List<DetectionResult> {
@@ -42,7 +42,7 @@ class CombinedObjectDetectorManager(
         )
     }
 
-    // this is where we actually combine the lists and remove any duplicates.
+    // this is where the lists combine and duplicates are removed.
     private fun merge(
         efficientDetections:
             List<DetectionResult>,
@@ -62,7 +62,7 @@ class CombinedObjectDetectorManager(
             mutableListOf<DetectionResult>()
 
         combined.forEach { candidate ->
-            // we check if we already have this object in the list.
+            // check if this object is already in the list.
             val duplicateIndex =
                 merged.indexOfFirst {
                         existing ->
@@ -79,7 +79,7 @@ class CombinedObjectDetectorManager(
                         DUPLICATE_IOU_THRESHOLD
                 }
 
-            // if it's new, add it. if it's better than what we have, replace the old one.
+            // if it's new, add it. if it's better than what currently exists, replace the old one.
             if (duplicateIndex < 0) {
                 merged += candidate
             } else if (
@@ -112,11 +112,11 @@ class CombinedObjectDetectorManager(
     }
 
     companion object {
-        // how much overlap we allow before saying it's the same thing.
+        // how much overlap is allowed before saying it's the same thing.
         private const val DUPLICATE_IOU_THRESHOLD =
             0.55f
 
-        // only return the top 30 results so we don't overwhelm the UI.
+        // only return the top 30 results so the UI is not overwhelmed.
         private const val MAX_RESULTS =
             30
     }

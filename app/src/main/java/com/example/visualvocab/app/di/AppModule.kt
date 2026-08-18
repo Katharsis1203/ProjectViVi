@@ -15,7 +15,7 @@ import com.example.visualvocab.domain.usecase.GenerateVocabularyUseCase
 import com.example.visualvocab.domain.usecase.RegenerateSentenceUseCase
 
 // this class is like a big container for all the things the app needs to work.
-// it makes sure we don't have to keep creating new stuff all the time.
+// it makes sure the app doesn't have to keep creating new stuff all the time.
 class AppModule(private val context: Context) {
 
     private val dispatchers by lazy { AppDispatchers() }
@@ -25,12 +25,12 @@ class AppModule(private val context: Context) {
         BitmapLoader(context, dispatchers)
     }
 
-    // groq is the smart AI thing we use for translating words.
+    // groq is the smart AI thing for translating words.
     private val groqManager by lazy {
         GroqManager(BuildConfig.GROQ_API_KEY)
     }
 
-    // this manages how we talk to the AI to get new words.
+    // this manages how the app talks to the AI to get new words.
     private val vocabularyRepository: VocabularyRepository by lazy {
         VocabularyRepositoryImpl(groqManager)
     }

@@ -101,7 +101,7 @@ import com.example.visualvocab.ui.theme.SuccessGreen
 @Composable
 fun VisualVocabScreen(viewModel: VocabViewModel) {
     val uiState by viewModel.uiState.collectAsState()
-    // keep track of which sub-screen we are on.
+    // keep track of which sub-screen is active.
     var destination by rememberSaveable { mutableStateOf(VisualVocabDestination.HOME) }
     var selectedWordKey by rememberSaveable { mutableStateOf<String?>(null) }
     var reviewReturnDestination by rememberSaveable { mutableStateOf(VisualVocabDestination.HOME) }

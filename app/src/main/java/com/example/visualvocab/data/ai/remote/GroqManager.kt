@@ -17,12 +17,12 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
-// this class is what we use to talk to the Groq AI service.
+// this class is what the app uses to talk to the Groq AI service.
 class GroqManager(
     private val apiKey: String
 ) {
 
-    // we set up the HTTP client here with some timeouts so it doesn't wait forever.
+    // setting up the HTTP client here with some timeouts so it doesn't wait forever.
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .writeTimeout(10, TimeUnit.SECONDS)
@@ -36,7 +36,7 @@ class GroqManager(
         isLenient = true
     }
 
-    // this is the main function that asks the AI for words based on what we saw.
+    // this is the main function that asks the AI for words based on what the app saw.
     suspend fun generateVocabulary(
         word: String,
         previousEnglishSentence: String?,
@@ -44,7 +44,7 @@ class GroqManager(
     ): VocabularyResultDto {
         val cleanedWord = word.trim().lowercase()
 
-        // make sure we actually have a word to look up.
+        // make sure a word actually exists to look up.
         require(cleanedWord.isNotBlank()) {
             "The selected word is empty."
         }
@@ -58,6 +58,8 @@ class GroqManager(
         }
 
         // building the request to send to the AI.
+        // i tried using temperature 0.7 before but the AI was getting way too 
+        // creative with the translations, so 0.35 is safer for a tutor app.
         val requestBody = GroqRequestDto(
             model = MODEL_NAME,
             messages = listOf(
@@ -96,7 +98,7 @@ class GroqManager(
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string()
 
-                // if the server says no, we throw an error.
+                // if the server says no, the app throws an error.
                 if (!response.isSuccessful) {
                     val details = body
                         ?.take(300)
@@ -119,7 +121,7 @@ class GroqManager(
             }
         }
 
-        // turn the response into something we can use in the app.
+        // turning the response into something the app can use.
         val groqResponse =
             json.decodeFromString<GroqResponseDto>(responseText)
 
@@ -144,7 +146,7 @@ class GroqManager(
         }
     }
 
-    // this part builds the message we send to the AI so it knows what to do.
+    // this part builds the message sent to the AI so it knows what to do.
     private fun createPrompt(
         word: String,
         previousSentence: String?,
@@ -158,7 +160,7 @@ class GroqManager(
             }
             .orEmpty()
 
-        // we tell the AI how hard the sentences should be.
+        // the app tells the AI how hard the sentences should be.
         val difficultyInstruction = when (difficulty) {
             SentenceDifficulty.EASY -> """
                 Difficulty: EASY.
@@ -199,6 +201,9 @@ class GroqManager(
             - Keep both sentences equivalent in meaning and difficulty.
             - Do not invent an unrelated object.
             - Preserve natural Spanish articles and grammatical gender.
+            
+            // i added this bit about natural articles because it kept giving 
+            // me "manzana" instead of "la manzana" in some tests.
 
             Return exactly this JSON structure:
 
@@ -211,7 +216,7 @@ class GroqManager(
         """.trimIndent()
     }
 
-    // sometimes the AI puts its answer in a code block, so we have to clean that up.
+    // sometimes the AI puts its answer in a code block, so the app has to clean that up.
     private fun String.removeMarkdownFence(): String {
         return trim()
             .removePrefix("```json")

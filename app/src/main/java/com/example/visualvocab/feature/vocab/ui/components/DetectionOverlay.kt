@@ -110,7 +110,7 @@ fun DetectionOverlay(
                 style = Stroke(width = strokeWidth)
             )
 
-            // don't show the name if we are playing "tap the object".
+            // don't show the name if the game is "tap the object".
             if (!showLabels) return@forEach
 
             val objectName = detection.label

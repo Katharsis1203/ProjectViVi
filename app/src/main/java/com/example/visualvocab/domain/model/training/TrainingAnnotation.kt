@@ -11,7 +11,7 @@ data class TrainingAnnotation(
     val originalConfidence: Float? = null
 ) {
     init {
-        // we make sure the label isn't empty and the coordinates are sensible.
+        // the label must not be empty and the coordinates must be sensible.
         require(label.isNotBlank()) {
             "Annotation label cannot be blank."
         }

@@ -5,7 +5,7 @@ import java.util.UUID
 
 // this helps us keep track of which phone is which without knowing who the user is.
 class InstallationIdProvider(context: Context) {
-    // we save a random ID in the phone's shared preferences.
+    // a random ID is saved in the phone's shared preferences.
     private val preferences = context.applicationContext.getSharedPreferences(
         "visual_vocab_installation",
         Context.MODE_PRIVATE

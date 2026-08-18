@@ -1,6 +1,6 @@
 package com.example.visualvocab.data.modelupdate
 
-// just a place to store the URL where we check for model updates.
+// just a place to store the URL for checking model updates.
 object ModelUpdateConfig {
 
     const val MANIFEST_URL =

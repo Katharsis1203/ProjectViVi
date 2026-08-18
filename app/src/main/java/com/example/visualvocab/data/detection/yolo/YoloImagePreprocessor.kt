@@ -20,7 +20,7 @@ internal class YoloImagePreprocessor(
         NCHW
     }
 
-    // information about the processed image so we can fix the box coordinates later.
+    // information about the processed image so the app can fix the box coordinates later.
     data class Result(
         val buffer: ByteBuffer,
         val scale: Float,
@@ -74,6 +74,8 @@ internal class YoloImagePreprocessor(
                 .coerceAtLeast(1)
 
         // calculate padding to center the image.
+        // n = (640 - 640*scale) / 2 ... basically just centering the scaled bit
+        // so the model sees the object in the middle of its square.
         val paddingX =
             (inputSize - resizedWidth) /
                 2f
@@ -147,6 +149,8 @@ internal class YoloImagePreprocessor(
             )
 
         // put the pixel values into the buffer in the format the model wants.
+        // i have to divide by 255 here to get the 0.0-1.0 range the yolo model needs.
+        // bit of a pain doing this pixel by pixel but at least it's simple to understand.
         if (dataLayout == DataLayout.NHWC) {
             pixels.forEach { pixel ->
                 buffer.putFloat(

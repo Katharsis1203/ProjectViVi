@@ -117,7 +117,7 @@ class ModelDownloadClient {
         val responseCode =
             connection.responseCode
 
-        // if the server says no, we stop and throw an error.
+        // if the server says no, the app stops and throws an error.
         if (
             responseCode !in
             200..299

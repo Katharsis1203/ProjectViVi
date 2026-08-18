@@ -3,7 +3,7 @@ package com.example.visualvocab.feature.vocab.presentation
 import android.graphics.RectF
 import java.util.UUID
 
-// this class is for a label that we are currently editing or confirming.
+// this class is for a label that is currently being edited or confirmed.
 data class EditableTrainingAnnotation(
     val id: String = UUID.randomUUID().toString(),
     val label: String,

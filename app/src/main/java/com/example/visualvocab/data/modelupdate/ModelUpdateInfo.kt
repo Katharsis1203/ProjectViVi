@@ -1,6 +1,6 @@
 package com.example.visualvocab.data.modelupdate
 
-// this class holds info about a potential update and can tell us if it's actually newer than what we have.
+// this class holds info about a potential update and shows if it's newer than the current one.
 data class ModelUpdateInfo(
     val manifest: ModelManifest,
     val currentVersion: String

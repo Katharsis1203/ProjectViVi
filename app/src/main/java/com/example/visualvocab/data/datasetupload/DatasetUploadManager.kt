@@ -19,7 +19,7 @@ class DatasetUploadManager(
 
     // this is the main function you call to upload everything.
     suspend fun uploadDataset(): DatasetUploadResult {
-        // first see how many examples we actually have.
+        // first see how many examples actually exist.
         val exampleCount = trainingRepository.getExampleCount()
         require(exampleCount > 0) {
             "No saved training examples are available to upload."

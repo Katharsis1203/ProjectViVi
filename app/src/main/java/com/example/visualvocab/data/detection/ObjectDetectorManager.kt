@@ -36,7 +36,7 @@ class ObjectDetectorManager(private val context: Context) {
 
     // run the detection on a bitmap.
     fun detect(bitmap: Bitmap): List<DetectionResult> {
-        // we need to make sure the bitmap is in the right format.
+        // the bitmap needs to be in the right format.
         val argbBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
         val mpImage = BitmapImageBuilder(argbBitmap).build()
         val detectionResult = detector?.detect(mpImage)
@@ -54,7 +54,7 @@ class ObjectDetectorManager(private val context: Context) {
         } ?: emptyList()
     }
 
-    // free up memory when we are done.
+    // free up memory when finished.
     fun close() {
         detector?.close()
         detector = null

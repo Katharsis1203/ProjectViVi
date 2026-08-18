@@ -13,7 +13,7 @@ class GenerateVocabularyUseCase(
         word: String,
         difficulty: SentenceDifficulty
     ): Flow<Vocabulary> {
-        // we just call the repository without any previous sentence.
+        // call the repository without any previous sentence.
         return repository.getVocabulary(
             word = word,
             previousSentence = null,

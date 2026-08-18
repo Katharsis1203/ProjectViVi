@@ -2,7 +2,7 @@ package com.example.visualvocab.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// this file has all the colors we use in the app to make it look pretty.
+// this file has all the colors used in the app to make it look pretty.
 val ExplorerBlue = Color(0xFF536DFE)
 val ExplorerBlueDark = Color(0xFF3446C8)
 val ExplorerBlueSoft = Color(0xFFE8ECFF)

@@ -14,7 +14,7 @@ class RegenerateSentenceUseCase(
         previousSentence: String,
         difficulty: SentenceDifficulty
     ): Flow<Vocabulary> {
-        // we pass the old sentence so the AI knows to give us a new one.
+        // passing the old sentence so the AI knows to give a new one.
         return repository.getVocabulary(
             word = word,
             previousSentence = previousSentence,

@@ -12,7 +12,7 @@ import java.util.UUID
 
 // this class is for uploading our dataset zip files to the server.
 class DatasetUploadClient {
-    // we use this to turn our metadata into JSON strings.
+    // this turns the metadata into JSON strings.
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
@@ -24,7 +24,7 @@ class DatasetUploadClient {
         datasetZip: ByteArray,
         metadata: UploadMetadata
     ): DatasetUploadResult = withContext(Dispatchers.IO) {
-        // we only allow HTTPS because it's safer.
+        // only HTTPS is allowed because it's safer.
         require(uploadUrl.startsWith("https://")) {
             "Dataset uploads must use HTTPS."
         }
@@ -33,7 +33,7 @@ class DatasetUploadClient {
             "The dataset ZIP is empty."
         }
 
-        // we need a unique boundary for our multipart request so the server knows where things end.
+        // a unique boundary for the multipart request is needed so the server knows where things end.
         val boundary = "VisualVocab-${UUID.randomUUID()}"
         val connection = URL(uploadUrl).openConnection() as HttpURLConnection
         connection.requestMethod = "POST"
@@ -48,7 +48,7 @@ class DatasetUploadClient {
         )
 
         try {
-            // here we write the metadata and the actual ZIP file into the request.
+            // here the metadata and the actual ZIP file go into the request.
             connection.outputStream.buffered().use { output ->
                 val writer = MultipartBodyWriter(output, boundary)
                 writer.writeTextPart("metadata", json.encodeToString(metadata))
@@ -64,7 +64,7 @@ class DatasetUploadClient {
                 writer.finish()
             }
 
-            // check if the server liked what we sent.
+            // check if the server liked what was sent.
             val responseCode = connection.responseCode
             val responseText = (
                 if (responseCode in 200..299) connection.inputStream

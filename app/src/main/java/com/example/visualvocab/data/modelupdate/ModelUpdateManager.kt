@@ -65,7 +65,7 @@ class ModelUpdateManager(
                             .pendingMetadataFile
                 )
 
-            // make sure everything is okay before we swap it out.
+            // make sure everything is okay before swapping it out.
             validator.validate(
                 manifest = manifest,
                 modelFile =

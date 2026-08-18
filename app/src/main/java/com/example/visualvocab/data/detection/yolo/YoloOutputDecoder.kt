@@ -6,7 +6,7 @@ import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 
-// this class turns the raw numbers from the YOLO model into something we can understand.
+// this class turns the raw numbers from the YOLO model into something understandable.
 internal class YoloOutputDecoder(
     private val classNames:
         List<String>,

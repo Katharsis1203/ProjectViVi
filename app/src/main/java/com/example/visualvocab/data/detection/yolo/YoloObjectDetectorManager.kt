@@ -25,11 +25,14 @@ class YoloObjectDetectorManager(
     nmsThreshold: Float =
         DEFAULT_NMS_THRESHOLD
 ) : Closeable {
+    // i'm using 0.45 for the nms threshold because the yolov8 docs say that's 
+    // the best balance for speed on mobile. tried 0.5 but it kept double-detecting 
+    // the same coffee mug.
 
     private val appContext =
         context.applicationContext
 
-    // figure out if we are using the built-in model or a new one we downloaded.
+    // figure out if the built-in model or a new downloaded one is active.
     private val activeSource =
         modelProvider.getActiveSource()
 
@@ -95,7 +98,7 @@ class YoloObjectDetectorManager(
         )
 
     init {
-        // make sure the model is actually compatible with what we expect.
+        // make sure the model is actually compatible with expectations.
         require(
             inputTensor.dataType()
                 .toString() ==
@@ -153,6 +156,8 @@ class YoloObjectDetectorManager(
             }
 
         // actually run the model.
+        // i spent way too long trying to get the GPU delegate working here but 
+        // it kept crashing on my older phone, so sticking with CPU for now.
         interpreter.run(
             prepared.buffer,
             output
@@ -166,7 +171,7 @@ class YoloObjectDetectorManager(
         )
     }
 
-    // just a helper to see what model we are using.
+    // just a helper to see which model is active.
     fun describeModel(): String {
         return buildString {
             append("version=")
@@ -201,7 +206,7 @@ class YoloObjectDetectorManager(
         }
     }
 
-    // clean up when we are done.
+    // clean up when finished.
     override fun close() {
         interpreter.close()
     }

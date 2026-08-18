@@ -30,7 +30,7 @@ import com.example.visualvocab.feature.vocab.presentation.EditableTrainingAnnota
 import java.util.Locale
 import kotlin.math.abs
 
-// this component lets users draw boxes on top of a photo to show vivi where things are.
+// this component lets users draw boxes on top of a photo to show vivi where things exist.
 @Composable
 fun AnnotationOverlay(
     detections: List<DetectionResult>,
@@ -288,7 +288,7 @@ fun AnnotationOverlay(
                 useCropScale = useCropScale
             )
 
-            // here we draw labels for everything we've found or added.
+            // labels for everything found or added are drawn here.
             fun drawLabel(
                 text: String,
                 anchorLeft: Float,

@@ -9,7 +9,7 @@ class VisualVocabApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        // we just set up the app module here so the rest of the app can use it later.
+        // setting up the app module here so the rest of the app can use it later.
         appModule = AppModule(this)
     }
 }

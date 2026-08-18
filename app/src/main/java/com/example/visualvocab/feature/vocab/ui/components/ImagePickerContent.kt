@@ -165,7 +165,7 @@ fun ImagePickerContent(
                     )
                 }
 
-                // if we are in learning mode, show a link to the teaching mode.
+                // if the app is in learning mode, show a link to the teaching mode.
                 if (!isTeachMode) {
                     onOpenCreatorStudio?.let { openCreatorStudio ->
                         Spacer(Modifier.height(12.dp))

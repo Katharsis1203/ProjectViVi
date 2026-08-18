@@ -46,7 +46,7 @@ class VocabViewModel(
     private val playerProgressStore: PlayerProgressStore
 ) : ViewModel() {
 
-    // load the player's saved progress when we start.
+    // load the player's saved progress at the start.
     private val initialPlayerProgress = runCatching { playerProgressStore.load() }
         .getOrDefault(PlayerProgress())
 
@@ -63,19 +63,20 @@ class VocabViewModel(
     private val _uiEffect = MutableSharedFlow<VocabUiEffect>()
     val uiEffect: SharedFlow<VocabUiEffect> = _uiEffect.asSharedFlow()
 
-    // keeping track of background jobs so we can cancel them if needed.
+    // keeping track of background jobs so they can be canceled if needed.
     private var imageLoadingJob: Job? = null
     private var detectionJob: Job? = null
     private var generationJob: Job? = null
     private var trainingJob: Job? = null
 
     init {
-        // check how many training examples we already have saved.
+        // check how many training examples are already saved.
         refreshTrainingExampleCount()
     }
 
     // this is the main way the UI tells us that something happened.
     fun onEvent(event: VocabUiEvent) {
+        // Log.d("DEBUG_UI", "event received: ${event::class.simpleName}")
         when (event) {
             is VocabUiEvent.ImageSelected -> handleImageSelected(event.uri)
             VocabUiEvent.AnalyzeImage -> analyzeImage()
@@ -156,6 +157,8 @@ class VocabViewModel(
 
     // called when the user picks a new photo from their phone.
     private fun handleImageSelected(uri: Uri) {
+        // have to cancel the old jobs or the app might crash if you pick 
+        // two images really fast. had this bug in the demo and it was embarrassing.
         imageLoadingJob?.cancel()
         detectionJob?.cancel()
         generationJob?.cancel()
@@ -169,7 +172,7 @@ class VocabViewModel(
 
         imageLoadingJob = viewModelScope.launch {
             try {
-                // tell the UI we are busy loading.
+                // tell the UI that loading is active.
                 _uiState.value = VocabUiState(
                     selectedImageUri = uri,
                     isDetecting = true,
@@ -266,7 +269,11 @@ class VocabViewModel(
 
         detectionJob = viewModelScope.launch {
             try {
+                // val start = System.currentTimeMillis()
                 detectObjectsUseCase(bitmap).collect { output ->
+                    // val end = System.currentTimeMillis()
+                    // println("detection took ${end - start}ms")
+                    
                     val distinctDetections = output.detections.distinctBy(::detectionKey)
                     _uiState.update {
                         it.copy(
@@ -283,7 +290,7 @@ class VocabViewModel(
                             }
                         )
                     }
-                    // start the first question automatically if we found things.
+                    // start the first question automatically if things were found.
                     prepareAutomaticScanQuestion()
                 }
             } catch (exception: CancellationException) {
@@ -336,7 +343,7 @@ class VocabViewModel(
             return
         }
 
-        // decide what kind of question to ask based on how many objects we found.
+        // decide what kind of question to ask based on how many objects were found.
         val questionType = questionTypeForScanIndex(
             index = current.lessonAnsweredCount,
             detectionCount = current.detections.size
@@ -467,7 +474,7 @@ class VocabViewModel(
         )
         if (questionType != LessonQuestionType.TAP_OBJECT) return
 
-        // find an object we haven't asked about yet.
+        // find an object not yet asked about.
         val remainingDetections = current.detections.filterNot { candidate ->
             current.completedLessonDetections.any { completed ->
                 detectionKey(candidate) == detectionKey(completed)
@@ -667,7 +674,7 @@ class VocabViewModel(
                 errorMessage = null
             )
         }
-        // save to disk so we don't lose progress.
+        // save to disk so progress is not lost.
         savePlayerProgress(answerUpdate.progress)
     }
 
@@ -1053,7 +1060,7 @@ class VocabViewModel(
         return words.random()
     }
 
-    // in teach mode, takes an object found by the detector and turns it into a label we can edit.
+    // in teach mode, takes an object found by the detector and turns it into an editable label.
     private fun addDetectionAnnotation(detection: DetectionResult) {
         val existing = AnnotationRules.findMatchingDetectionAnnotation(
             annotations = _uiState.value.editableTrainingAnnotations,
@@ -1268,7 +1275,7 @@ class VocabViewModel(
         }
     }
 
-    // exports all our training data to a ZIP file so we can send it somewhere.
+    // exports all training data to a ZIP file so it can be sent.
     private fun exportTrainingDataset(destination: Uri) {
         trainingJob?.cancel()
         trainingJob = viewModelScope.launch {
@@ -1297,7 +1304,7 @@ class VocabViewModel(
         }
     }
 
-    // uploads all our saved training examples to the backend server.
+    // uploads all saved training examples to the backend server.
     private fun uploadTrainingDataset() {
         if (_uiState.value.trainingExampleCount <= 0) {
             _uiState.update {

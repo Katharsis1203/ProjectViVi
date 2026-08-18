@@ -16,7 +16,7 @@ class DetectObjectsUseCase(
         val labels: List<String>
     )
 
-    // we call both detection methods and wait for both to finish.
+    // both detection methods are called and wait for both to finish.
     operator fun invoke(bitmap: Bitmap): Flow<DetectionOutput> {
         return combine(
             repository.detectObjects(bitmap),

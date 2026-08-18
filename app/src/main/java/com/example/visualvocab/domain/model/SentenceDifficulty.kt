@@ -1,6 +1,6 @@
 package com.example.visualvocab.domain.model
 
-// we use this to set how hard the sentences should be for the user.
+// this sets how hard the sentences should be for the user.
 enum class SentenceDifficulty {
     EASY,
     MEDIUM,

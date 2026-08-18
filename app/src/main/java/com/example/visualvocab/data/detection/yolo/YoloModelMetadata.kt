@@ -32,7 +32,7 @@ data class YoloModelMetadata(
                 ignoreUnknownKeys = true
             }
 
-        // load the metadata from either the assets or a file we downloaded.
+        // load the metadata from either the assets or a downloaded file.
         fun load(
             context: Context,
             source: YoloModelSource

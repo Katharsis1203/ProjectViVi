@@ -70,7 +70,7 @@ data class VocabUiState(
     val recentXpAward: Int = 0,
     val xpAnimationToken: Long = 0L,
 
-    // stuff for teach mode where we label images.
+    // stuff for teach mode where images are labeled.
     val targetWord: String? = null,
     val annotationTool: AnnotationTool = AnnotationTool.SELECT,
     val editableTrainingAnnotations: List<EditableTrainingAnnotation> = emptyList(),

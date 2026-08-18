@@ -69,7 +69,7 @@ class ModelInstaller(
             overwrite = true
         )
 
-        // save the version and manifest so we know what we have installed.
+        // save the version and manifest so the app knows what's installed.
         fileStore.activeVersionFile
             .writeText(
                 manifest.version

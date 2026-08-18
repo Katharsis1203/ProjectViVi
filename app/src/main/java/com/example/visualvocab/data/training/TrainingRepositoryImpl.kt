@@ -41,7 +41,7 @@ class TrainingRepositoryImpl(
                 TRAINING_DIRECTORY
             )
 
-    // folder where we store the photos.
+    // folder where the photos are stored.
     private val imageDirectory: File
         get() =
             File(
@@ -63,7 +63,7 @@ class TrainingRepositoryImpl(
         annotations:
         List<TrainingAnnotation>
     ) = withContext(Dispatchers.IO) {
-        // we need at least one label to save anything.
+        // at least one label is needed to save anything.
         require(
             annotations.isNotEmpty()
         ) {
@@ -147,7 +147,7 @@ class TrainingRepositoryImpl(
         )
     }
 
-    // get all the examples we have saved so far.
+    // get all the examples saved so far.
     override suspend fun getExamples(): List<AnnotatedExample> = withContext(Dispatchers.IO) {
         readDataset().examples.map { stored ->
             AnnotatedExample(
@@ -201,7 +201,7 @@ class TrainingRepositoryImpl(
             "No training examples have been saved."
         }
 
-        // find all the unique labels we've used.
+        // find all the unique labels used.
         val classNames =
             dataset.examples
                 .flatMap {

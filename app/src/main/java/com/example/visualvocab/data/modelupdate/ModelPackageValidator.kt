@@ -85,7 +85,7 @@ class ModelPackageValidator(
                     .getOutputTensor(0)
                     .shape()
 
-            // make sure the input and output shapes are what we expect.
+            // make sure the input and output shapes match expectations.
             require(
                 inputShape.size == 4 &&
                     inputShape[0] == 1

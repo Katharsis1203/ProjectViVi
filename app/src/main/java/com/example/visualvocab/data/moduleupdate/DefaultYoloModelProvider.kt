@@ -4,7 +4,7 @@ import android.content.Context
 import java.io.File
 
 // this class helps the app choose which YOLO model to use.
-// it checks if we have a newer downloaded one, otherwise it just uses the one that came with the app.
+// it checks for a newer downloaded one, otherwise it just uses the one that came with the app.
 class DefaultYoloModelProvider(
     context: Context,
     private val bundledModelAssetName: String =
@@ -47,7 +47,7 @@ class DefaultYoloModelProvider(
                 VERSION_FILE_NAME
             )
 
-    // tells us if we should load the model from the phone's files or from the app's assets.
+    // tells if the model should load from the phone's files or from the app's assets.
     override fun getActiveSource():
         YoloModelSource {
 

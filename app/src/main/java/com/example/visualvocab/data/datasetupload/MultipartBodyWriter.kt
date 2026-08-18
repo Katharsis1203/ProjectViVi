@@ -32,7 +32,7 @@ internal class MultipartBodyWriter(
         writeAscii("\r\n")
     }
 
-    // tells the server we are done sending data.
+    // tells the server all data is sent.
     fun finish() {
         writeAscii("--$boundary--\r\n")
         output.flush()
