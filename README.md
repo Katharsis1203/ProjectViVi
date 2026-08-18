@@ -1,3 +1,5 @@
+![VisualVocab Banner](assets/visualvocab-banner.png)
+
 # VisualVocab
 
 **VisualVocab** is a gamified Android vocabulary-learning application that combines contextual language learning with human-guided object annotation.
